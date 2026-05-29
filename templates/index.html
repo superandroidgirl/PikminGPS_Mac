@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PikminGPS — iOS GPS 模擬器</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+
+<body>
+
+  <div id="app">
+    <!-- Map area -->
+    <div id="map-container">
+      <div id="map"></div>
+      <div class="info-box" id="info">Lat: 25.033000 | Lng: 121.565400</div>
+      <div class="route-hint" id="routeHint"></div>
+      <div class="nav-info" id="navInfo"></div>
+    </div>
+
+    <!-- Control Panel -->
+    <div id="panel">
+      <div class="panel-scroll">
+        <h1 class="title">PikminGPS</h1>
+        <p class="subtitle">macOS Web Edition</p>
+
+        <!-- Device -->
+        <div class="group">
+          <div class="group-title">裝置</div>
+          <div class="row">
+            <label>連線:</label>
+            <select id="connType">
+              <option value="USB">USB</option>
+              <option value="WiFi">WiFi</option>
+              <option value="自動">自動</option>
+            </select>
+          </div>
+          <div class="row">
+            <button id="btnConnect" class="btn flex-1">連接 iPhone</button>
+            <button id="btnStop" class="btn flex-1" disabled>停止模擬</button>
+          </div>
+          <div class="row">
+            <button id="btnTunneld" class="btn flex-1" title="iOS 17+ 裝置需先啟動通道">啟動 iOS 17+ 通道</button>
+          </div>
+          <div class="device-label" id="deviceLabel">尚未連接裝置</div>
+        </div>
+
+        <!-- Teleport -->
+        <div class="group">
+          <div class="group-title">傳送</div>
+          <div class="row">
+            <input type="text" id="coordInput" value="25.033000, 121.565400" placeholder="緯度, 經度" />
+            <button id="btnTeleport" class="btn" style="width:60px">傳送</button>
+          </div>
+        </div>
+
+        <!-- Gold Ditto (拉金盆) -->
+        <div class="group goldditto-group">
+          <div class="group-title">🌼 金盆模式 (拉金盆)</div>
+          <div class="info-label goldditto-flow">
+            操作流程: 手動飛到金盆點開花苞，等待「在特殊花朵上往下滑動就能獲得獎勵」提示出來，再等 2 秒，再按下方「拉金盆」開始拉盆
+          </div>
+          <div class="row">
+            <label style="min-width:60px">A 座標:</label>
+            <input type="text" id="goldDittoA" placeholder="例: 25.034897, 121.545827" />
+            <button id="btnGoldDittoToggleHide" class="btn-icon" title="顯示/隱藏座標">👁</button>
+          </div>
+          <div class="info-label goldditto-hint">請填你目前真實位置的座標 (A 點)</div>
+          <div class="row">
+            <button id="btnGoldDittoUseCurrent" class="btn flex-1">使用目前位置</button>
+            <button id="btnGoldDittoStart" class="btn flex-1 btn-primary">拉金盆</button>
+          </div>
+        </div>
+
+        <!-- Favorites -->
+        <div class="group">
+          <div class="group-title">我的最愛</div>
+          <div id="favList" class="fav-list"></div>
+          <div class="row">
+            <button id="btnFavSave" class="btn flex-1">儲存目前位置</button>
+            <button id="btnFavDel" class="btn flex-1">刪除</button>
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div class="group">
+          <div class="group-title">速度</div>
+          <div class="row">
+            <select id="speedPreset">
+              <option value="5">步行 (5 km/h)</option>
+              <option value="8">慢跑 (8 km/h)</option>
+              <option value="12">跑步 (12 km/h)</option>
+              <option value="20">騎車 (20 km/h)</option>
+              <option value="60">開車 (60 km/h)</option>
+            </select>
+            <input type="number" id="speedInput" value="5" min="0.5" max="120" step="0.5" style="width:90px" />
+            <span class="unit">km/h</span>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="group">
+          <div class="group-title">導航路線</div>
+          <div class="row">
+            <button id="btnNavMode" class="btn flex-1">導航規劃</button>
+            <button id="btnGpxImport" class="btn flex-1">匯入 GPX</button>
+            <button id="btnNavPlan" class="btn flex-1" disabled>規劃路線</button>
+          </div>
+          <div class="info-label" id="navInfoLabel">點擊「導航規劃」設定路徑點</div>
+          <div class="row">
+            <button id="btnNavStart" class="btn flex-1" disabled>開始行走</button>
+            <button id="btnNavStop" class="btn flex-1" disabled>停止行走</button>
+            <button id="btnNavClear" class="btn flex-1" disabled>清除導航</button>
+          </div>
+          <div class="row">
+            <label class="checkbox"><input type="checkbox" id="navLoop" /> 循環路線</label>
+            <div style="flex:1"></div>
+            <button id="btnCenter" class="btn-icon" title="回到目前位置">⊕</button>
+          </div>
+          <div class="info-label green" id="navRemainingLabel"></div>
+        </div>
+
+        <!-- Manual Route -->
+        <div class="group">
+          <div class="group-title">手動路線</div>
+          <div class="row">
+            <button id="btnRouteMode" class="btn flex-1">繪製路線</button>
+            <button id="btnRouteRedraw" class="btn flex-1" disabled>重新繪製</button>
+          </div>
+          <div class="row">
+            <button id="btnRouteStart" class="btn flex-1" disabled>開始</button>
+            <button id="btnRouteStop" class="btn flex-1" disabled>停止</button>
+          </div>
+          <label class="checkbox"><input type="checkbox" id="routeLoop" /> 循環路線</label>
+          <div class="info-label" id="routeLabel">尚未設定路線</div>
+        </div>
+
+        <!-- Joystick -->
+        <div class="group">
+          <div class="group-title">搖桿 / 方向鍵</div>
+          <div class="joystick-container">
+            <canvas id="joystick" width="160" height="160"></canvas>
+          </div>
+          <div class="info-label" style="text-align:center;margin-top:4px;">拖曳搖桿或使用鍵盤方向鍵</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusBar">就緒 — 請透過 USB 或 WiFi 連接 iPhone</div>
+
+  <!-- Device selection modal -->
+  <div id="deviceModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>選擇裝置</h3>
+      <div id="deviceListModal"></div>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button id="btnModalCancel" class="btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GPX file input (hidden) -->
+  <input type="file" id="gpxFileInput" accept=".gpx" style="display:none" />
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <script src="/static/js/joystick.js"></script>
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+
+</html>

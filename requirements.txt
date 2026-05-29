@@ -1,0 +1,4 @@
+flask>=3.0
+flask-socketio>=5.3
+pymobiledevice3>=4.0
+requests>=2.31

@@ -1,0 +1,449 @@
+/* PikminGPS Web — Dark Catppuccin Theme */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#app {
+  display: flex;
+  height: calc(100vh - 28px);
+}
+
+/* ── Map ── */
+
+#map-container {
+  flex: 1;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.info-box {
+  position: absolute; bottom: 10px; left: 10px;
+  z-index: 1000; background: rgba(0,0,0,0.75);
+  color: #0f0; padding: 8px 14px; border-radius: 8px;
+  font-family: 'SF Mono', 'Menlo', monospace; font-size: 13px;
+  pointer-events: none;
+}
+
+.route-hint {
+  position: absolute; top: 10px; right: 10px;
+  z-index: 1000; background: rgba(0,0,0,0.7);
+  color: #fff; padding: 6px 12px; border-radius: 6px;
+  font-size: 12px; display: none;
+}
+
+.nav-info {
+  position: absolute; top: 10px; left: 10px;
+  z-index: 1000; background: rgba(30,30,46,0.9);
+  color: #a6e3a1; padding: 8px 14px; border-radius: 8px;
+  font-family: 'SF Mono', 'Menlo', monospace; font-size: 13px;
+  display: none; white-space: pre-line;
+}
+
+/* Leaflet marker animations */
+@keyframes breathe {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  50%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1);   opacity: 0; }
+}
+
+.marker-default { position: relative; width: 32px; height: 32px; }
+.marker-default .glow {
+  position: absolute; top: -8px; left: -8px;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(231, 76, 60, 0.4);
+  animation: breathe 2s ease-in-out infinite;
+  pointer-events: none;
+}
+.marker-default .dot {
+  position: relative; width: 16px; height: 16px; margin: 8px;
+  background: #e74c3c; border-radius: 50%;
+  border: 3px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  z-index: 1;
+}
+
+/* ── Panel ── */
+
+#panel {
+  width: 340px;
+  min-width: 340px;
+  background: #1e1e2e;
+  border-left: 1px solid rgba(137,180,250,0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.panel-scroll::-webkit-scrollbar { width: 8px; }
+.panel-scroll::-webkit-scrollbar-track { background: #1e1e2e; }
+.panel-scroll::-webkit-scrollbar-thumb { background: #45475a; border-radius: 4px; }
+.panel-scroll::-webkit-scrollbar-thumb:hover { background: #585b70; }
+
+.title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f5c2e7;
+  margin-bottom: 2px;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 11px;
+  color: #6c7086;
+  margin-bottom: 12px;
+}
+
+/* ── Group ── */
+
+.group {
+  border: 1px solid rgba(137,180,250,0.2);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.group-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #89b4fa;
+  margin-bottom: 8px;
+}
+
+/* ── Row ── */
+
+.row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.row label {
+  font-size: 12px;
+  color: #bac2de;
+  white-space: nowrap;
+}
+
+.flex-1 { flex: 1; }
+
+/* ── Inputs ── */
+
+input[type="text"],
+input[type="number"],
+select {
+  background: linear-gradient(to bottom, #282838, #313244);
+  border: 1px solid #505070;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #cdd6f4;
+  font-size: 13px;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+input:focus, select:focus {
+  border-color: #89b4fa;
+}
+
+select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2389b4fa' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.unit {
+  font-size: 12px;
+  color: #6c7086;
+  white-space: nowrap;
+}
+
+/* ── Buttons ── */
+
+.btn {
+  background: linear-gradient(to bottom, #3b3b55, #313244 40%, #282838);
+  border: 1px solid #505070;
+  border-bottom: 2px solid #252535;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #cdd6f4;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+  transition: all 0.1s;
+}
+
+.btn:hover {
+  background: linear-gradient(to bottom, #4b4b6a, #3f3f58 40%, #333348);
+  border-color: #7070a0;
+}
+
+.btn:active {
+  background: linear-gradient(to bottom, #282838, #313244 60%, #3b3b55);
+  border-top: 2px solid #252535;
+  border-bottom: 1px solid #505070;
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+
+.btn:disabled {
+  background: linear-gradient(to bottom, #252536, #1e1e2e);
+  color: #585b70;
+  border-color: #2a2a3c;
+  border-bottom: 2px solid #1a1a28;
+  cursor: not-allowed;
+}
+
+.btn.active {
+  background: linear-gradient(to bottom, #c0f0b8, #a6e3a1 40%, #88cc80);
+  border: 1px solid #70b868;
+  border-bottom: 2px solid #609060;
+  color: #1e1e2e;
+}
+
+.btn-icon {
+  background: linear-gradient(to bottom, #3b3b55, #313244);
+  border: 1px solid #505070;
+  border-radius: 6px;
+  width: 28px; height: 28px;
+  font-size: 16px;
+  color: #cdd6f4;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+
+.btn-icon:hover { border-color: #89b4fa; }
+
+/* ── Checkbox ── */
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #bac2de;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border: 1px solid #505070;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #282838, #313244);
+  cursor: pointer;
+  position: relative;
+}
+
+.checkbox input[type="checkbox"]:checked {
+  background: linear-gradient(to bottom, #b8f0b0, #a6e3a1);
+  border-color: #a6e3a1;
+}
+
+.checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px; top: 1px;
+  width: 5px; height: 9px;
+  border: solid #1e1e2e;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ── Info labels ── */
+
+.info-label {
+  font-size: 11px;
+  color: #bac2de;
+  margin: 4px 0;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.info-label.green { color: #a6e3a1; }
+
+.device-label {
+  text-align: center;
+  font-size: 11px;
+  color: #bac2de;
+  margin-top: 4px;
+}
+
+/* ── Favorites list ── */
+
+.fav-list {
+  background: linear-gradient(to bottom, #282838, #313244);
+  border: 1px solid #505070;
+  border-radius: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+
+.fav-item {
+  padding: 5px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #3b3b55;
+  user-select: none;
+}
+
+.fav-item:last-child { border-bottom: none; }
+.fav-item:hover { background: rgba(137,180,250,0.1); }
+.fav-item.selected { background: rgba(137,180,250,0.2); }
+
+/* ── Joystick ── */
+
+.joystick-container {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+#joystick {
+  cursor: grab;
+  touch-action: none;
+}
+
+#joystick:active { cursor: grabbing; }
+
+/* ── Status bar ── */
+
+#statusBar {
+  height: 28px;
+  background: #181825;
+  border-top: 1px solid rgba(137,180,250,0.1);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12px;
+  color: #6c7086;
+}
+
+/* ── Modal ── */
+
+.modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal.hidden { display: none; }
+
+.modal-content {
+  background: #313244;
+  border: 1px solid #505070;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 360px;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.modal-content h3 {
+  color: #89b4fa;
+  margin-bottom: 12px;
+}
+
+.device-option {
+  padding: 10px 12px;
+  border: 1px solid #505070;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.device-option:hover {
+  background: rgba(137,180,250,0.15);
+  border-color: #89b4fa;
+}
+
+/* ── Responsive ── */
+
+/* ── Gold Ditto (拉金盆) ── */
+
+.goldditto-group {
+  background: linear-gradient(to bottom, rgba(249, 226, 175, 0.08), rgba(249, 226, 175, 0.02));
+  border: 1px solid rgba(249, 226, 175, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.goldditto-group .group-title {
+  color: #f9e2af;
+}
+
+.goldditto-flow {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #f5c2e7;
+  background: rgba(0,0,0,0.2);
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.goldditto-hint {
+  font-size: 11px;
+  color: #a6adc8;
+  margin: 2px 0 4px 2px;
+}
+
+.btn-primary {
+  background: linear-gradient(to bottom, #f9e2af, #f5c768 40%, #d9a93f);
+  border: 1px solid #c08828;
+  border-bottom: 2px solid #8b6020;
+  color: #1e1e2e;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(to bottom, #fbe9c0, #f8d684 40%, #dfb653);
+  border-color: #d09838;
+}
+
+.btn-primary:active {
+  background: linear-gradient(to bottom, #d9a93f, #f5c768 60%, #f9e2af);
+  border-top: 2px solid #8b6020;
+  border-bottom: 1px solid #c08828;
+}
+
+.btn-primary:disabled {
+  background: linear-gradient(to bottom, #4a3f28, #2e2820);
+  color: #6c6a5c;
+  border-color: #3a3220;
+  border-bottom: 2px solid #1f1a10;
+}
+
+@media (max-width: 800px) {
+  #app { flex-direction: column; }
+  #panel { width: 100%; min-width: 100%; max-height: 50vh; }
+  #map-container { min-height: 50vh; }
+}
