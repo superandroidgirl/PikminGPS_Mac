@@ -20,6 +20,7 @@ dist/
 # Runtime / user data
 error.log
 *.log
+favorites.json
 
 # macOS
 .DS_Store
