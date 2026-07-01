@@ -49,6 +49,7 @@
   const btnRouteRedraw = $('btnRouteRedraw');
   const btnRouteStart = $('btnRouteStart');
   const btnRouteStop = $('btnRouteStop');
+  const btnRouteExport = $('btnRouteExport');
   const routeLoop = $('routeLoop');
   const routeLabel = $('routeLabel');
 
@@ -60,7 +61,14 @@
   const deviceModal = $('deviceModal');
   const deviceListModal = $('deviceListModal');
   const btnModalCancel = $('btnModalCancel');
-  const gpxFileInput = $('gpxFileInput');
+  const coordsModal = $('coordsModal');
+  const coordsInput = $('coordsInput');
+  const btnCoordsOk = $('btnCoordsOk');
+  const btnCoordsCancel = $('btnCoordsCancel');
+  const exportModal = $('exportModal');
+  const exportOutput = $('exportOutput');
+  const btnExportCopy = $('btnExportCopy');
+  const btnExportClose = $('btnExportClose');
 
   // ── State ──
   let favorites = [];
@@ -412,25 +420,28 @@
     setStatus('已清除導航路線');
   });
 
-  // GPX import
+  // Paste coordinates
   btnGpxImport.addEventListener('click', function () {
-    gpxFileInput.click();
+    coordsModal.classList.remove('hidden');
+    coordsInput.focus();
   });
 
-  gpxFileInput.addEventListener('change', function () {
-    const file = this.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const speed = parseFloat(speedInput.value) || 5;
-      socket.emit('import_gpx', {
-        content: e.target.result,
-        filename: file.name,
-        speed: speed,
-      });
-    };
-    reader.readAsText(file);
-    this.value = '';
+  btnCoordsCancel.addEventListener('click', function () {
+    coordsModal.classList.add('hidden');
+  });
+
+  btnCoordsOk.addEventListener('click', function () {
+    const text = coordsInput.value.trim();
+    if (!text) {
+      alert('請先貼上座標');
+      return;
+    }
+    const speed = parseFloat(speedInput.value) || 5;
+    socket.emit('import_coords', {
+      content: text,
+      speed: speed,
+    });
+    coordsModal.classList.add('hidden');
   });
 
   btnCenter.addEventListener('click', function () {
@@ -458,6 +469,7 @@
       if (routePoints.length >= 2) {
         btnRouteStart.disabled = false;
         btnRouteRedraw.disabled = false;
+        btnRouteExport.disabled = false;
         routeLabel.textContent = '路線: ' + routePoints.length + ' 個路徑點';
       } else {
         routeLabel.textContent = '至少需要 2 個路徑點';
@@ -471,6 +483,7 @@
     routePoints = [];
     btnRouteRedraw.disabled = true;
     btnRouteStart.disabled = true;
+    btnRouteExport.disabled = true;
     routeModeActive = true;
     btnRouteMode.textContent = '完成路線';
     setActive(btnRouteMode, true);
@@ -502,6 +515,30 @@
     mapCtrl.setAutoFollow(true);
     mapCtrl.updateNavInfo('');
     setStatus('路線行走已停止');
+  });
+
+  btnRouteExport.addEventListener('click', function () {
+    if (routePoints.length < 1) return;
+    exportOutput.value = routePoints
+      .map(function (p) { return p[0] + ',' + p[1]; })
+      .join('\n');
+    exportModal.classList.remove('hidden');
+  });
+
+  btnExportCopy.addEventListener('click', function () {
+    exportOutput.select();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(exportOutput.value)
+        .then(function () { setStatus('座標已複製'); })
+        .catch(function () { document.execCommand('copy'); setStatus('座標已複製'); });
+    } else {
+      document.execCommand('copy');
+      setStatus('座標已複製');
+    }
+  });
+
+  btnExportClose.addEventListener('click', function () {
+    exportModal.classList.add('hidden');
   });
 
   // ── Walk events ──

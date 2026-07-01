@@ -34,6 +34,7 @@ state = {
 }
 
 FAVORITES_FILE = os.path.join(os.path.dirname(__file__), "favorites.json")
+LAST_ROUTE_FILE = os.path.join(os.path.dirname(__file__), "last_route.json")
 
 
 def load_favorites():
@@ -316,6 +317,48 @@ def handle_import_gpx(data):
         emit("nav_error", {"error": str(e)})
 
 
+@socketio.on("import_coords")
+def handle_import_coords(data):
+    """Receive pasted 'lat,lng' lines and build a route."""
+    content = data.get("content", "")
+
+    try:
+        points = []
+        for lineno, raw in enumerate(content.splitlines(), 1):
+            line = raw.strip()
+            if not line:
+                continue
+            parts = line.replace("\t", ",").split(",")
+            if len(parts) < 2:
+                raise ValueError(f"第 {lineno} 行格式錯誤: {raw}")
+            lat = float(parts[0].strip())
+            lng = float(parts[1].strip())
+            points.append((lat, lng))
+
+        if len(points) < 2:
+            raise ValueError("至少需要 2 個座標點")
+
+        distance = calculate_route_distance(points)
+        state["nav_route_points"] = points
+        state["nav_total_distance"] = distance
+
+        speed = data.get("speed", 5.0)
+        speed_ms = speed * 1000.0 / 3600.0
+        eta = distance / speed_ms if speed_ms > 0 else 0
+
+        emit("nav_route_ready", {
+            "points": points,
+            "distance": distance,
+            "duration": eta,
+            "dist_text": format_distance(distance),
+            "time_text": format_duration(eta),
+            "filename": "貼上座標",
+        })
+    except Exception as e:
+        log_exception("Coords import failed")
+        emit("nav_error", {"error": str(e)})
+
+
 @socketio.on("start_walk")
 def handle_start_walk(data):
     points = data.get("points") or state["nav_route_points"]
@@ -328,6 +371,14 @@ def handle_start_walk(data):
 
     # Convert to list of tuples
     waypoints = [(p[0], p[1]) for p in points]
+
+    # Persist a backup copy of the route so coordinates can be recovered later.
+    try:
+        with open(LAST_ROUTE_FILE, "w", encoding="utf-8") as f:
+            json.dump([[p[0], p[1]] for p in points], f, ensure_ascii=False, indent=2)
+    except Exception:
+        log_exception("Failed to save last_route.json")
+
     walker.set_waypoints(waypoints)
     walker.set_speed(speed)
     walker.loop = loop
