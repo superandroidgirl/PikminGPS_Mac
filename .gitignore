@@ -21,6 +21,7 @@ dist/
 error.log
 *.log
 favorites.json
+last_route.json
 
 # macOS
 .DS_Store

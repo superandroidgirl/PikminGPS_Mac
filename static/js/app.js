@@ -34,6 +34,10 @@
   const speedPreset = $('speedPreset');
   const speedInput = $('speedInput');
 
+  const jumpMode = $('jumpMode');
+  const jumpPreDelay = $('jumpPreDelay');
+  const jumpPostDelay = $('jumpPostDelay');
+
   const btnNavMode = $('btnNavMode');
   const btnGpxImport = $('btnGpxImport');
   const btnNavPlan = $('btnNavPlan');
@@ -316,6 +320,37 @@
     socket.emit('update_speed', { speed: parseFloat(this.value) });
   });
 
+  // ── Point-to-point jump ──
+  const JUMP_MODE_KEY = 'pikmingps.jump.mode';
+  const JUMP_PRE_KEY = 'pikmingps.jump.pre';
+  const JUMP_POST_KEY = 'pikmingps.jump.post';
+
+  try {
+    if (localStorage.getItem(JUMP_MODE_KEY) === '1') jumpMode.checked = true;
+    const pre = localStorage.getItem(JUMP_PRE_KEY);
+    const post = localStorage.getItem(JUMP_POST_KEY);
+    if (pre !== null) jumpPreDelay.value = pre;
+    if (post !== null) jumpPostDelay.value = post;
+  } catch (e) { /* ignore */ }
+
+  jumpMode.addEventListener('change', function () {
+    try { localStorage.setItem(JUMP_MODE_KEY, jumpMode.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+  jumpPreDelay.addEventListener('change', function () {
+    try { localStorage.setItem(JUMP_PRE_KEY, jumpPreDelay.value); } catch (e) { /* ignore */ }
+  });
+  jumpPostDelay.addEventListener('change', function () {
+    try { localStorage.setItem(JUMP_POST_KEY, jumpPostDelay.value); } catch (e) { /* ignore */ }
+  });
+
+  function getJumpParams() {
+    return {
+      jump_mode: jumpMode.checked,
+      jump_pre_delay: parseFloat(jumpPreDelay.value) || 0,
+      jump_post_delay: parseFloat(jumpPostDelay.value) || 0,
+    };
+  }
+
   // ── Navigation ──
   btnNavMode.addEventListener('click', function () {
     if (navModeActive) {
@@ -377,7 +412,7 @@
   btnNavStart.addEventListener('click', function () {
     const speed = parseFloat(speedInput.value) || 5;
     const loop = navLoop.checked;
-    socket.emit('start_walk', { speed, loop });
+    socket.emit('start_walk', Object.assign({ speed, loop }, getJumpParams()));
     btnNavStart.disabled = true;
     btnNavStop.disabled = false;
     setActive(btnNavStart, true);
@@ -496,7 +531,7 @@
     if (routePoints.length < 2) return;
     const speed = parseFloat(speedInput.value) || 5;
     const loop = routeLoop.checked;
-    socket.emit('start_walk', { points: routePoints, speed, loop });
+    socket.emit('start_walk', Object.assign({ points: routePoints, speed, loop }, getJumpParams()));
     btnRouteStart.disabled = true;
     btnRouteStop.disabled = false;
     setActive(btnRouteStop, true);

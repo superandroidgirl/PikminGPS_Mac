@@ -30,6 +30,7 @@ state = {
     "connected": False,
     "favorites": [],
     "nav_route_points": [],
+    "nav_waypoints": [],  # raw user-picked waypoints (for point-to-point jump)
     "nav_total_distance": 0.0,
 }
 
@@ -260,6 +261,7 @@ def handle_plan_route(data):
         try:
             result = fetch_osrm_route(waypoints)
             state["nav_route_points"] = result["points"]
+            state["nav_waypoints"] = [(p[0], p[1]) for p in waypoints]
             state["nav_total_distance"] = result["distance"]
 
             speed_ms = speed * 1000.0 / 3600.0
@@ -298,6 +300,7 @@ def handle_import_gpx(data):
         os.unlink(tmp_path)
 
         state["nav_route_points"] = result["points"]
+        state["nav_waypoints"] = list(result["points"])
         state["nav_total_distance"] = result["distance"]
 
         speed = data.get("speed", 5.0)
@@ -340,6 +343,7 @@ def handle_import_coords(data):
 
         distance = calculate_route_distance(points)
         state["nav_route_points"] = points
+        state["nav_waypoints"] = list(points)
         state["nav_total_distance"] = distance
 
         speed = data.get("speed", 5.0)
@@ -361,9 +365,21 @@ def handle_import_coords(data):
 
 @socketio.on("start_walk")
 def handle_start_walk(data):
-    points = data.get("points") or state["nav_route_points"]
     speed = data.get("speed", 5.0)
     loop = data.get("loop", False)
+    jump_mode = data.get("jump_mode", False)
+    jump_pre = data.get("jump_pre_delay", 2.0)
+    jump_post = data.get("jump_post_delay", 4.0)
+
+    # In point-to-point jump mode we teleport between the raw user waypoints
+    # rather than the densified OSRM path, so prefer the raw waypoints for a
+    # navigation route that has no explicit points supplied.
+    if data.get("points"):
+        points = data["points"]
+    elif jump_mode and state["nav_waypoints"]:
+        points = state["nav_waypoints"]
+    else:
+        points = state["nav_route_points"]
 
     if len(points) < 2:
         emit("status", {"msg": "至少需要 2 個路徑點"})
@@ -382,9 +398,13 @@ def handle_start_walk(data):
     walker.set_waypoints(waypoints)
     walker.set_speed(speed)
     walker.loop = loop
+    walker.set_jump(jump_mode, jump_pre, jump_post)
     walker.start()
     emit("walk_started")
-    emit("status", {"msg": "行走已開始"})
+    if jump_mode:
+        emit("status", {"msg": f"點對點跳躍已開始 ({len(waypoints)} 個點)"})
+    else:
+        emit("status", {"msg": "行走已開始"})
 
 
 @socketio.on("stop_walk")

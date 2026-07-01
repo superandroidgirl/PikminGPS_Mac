@@ -100,6 +100,23 @@
           </div>
         </div>
 
+        <!-- Point-to-point jump -->
+        <div class="group">
+          <div class="group-title">點對點跳躍</div>
+          <label class="checkbox"><input type="checkbox" id="jumpMode" /> 啟用逐點瞬移（不走路徑）</label>
+          <div class="row">
+            <label style="min-width:72px">跳躍前延遲</label>
+            <input type="number" id="jumpPreDelay" value="2" min="0" max="120" step="0.5" style="width:70px" />
+            <span class="unit">秒</span>
+          </div>
+          <div class="row">
+            <label style="min-width:72px">跳躍後延遲</label>
+            <input type="number" id="jumpPostDelay" value="4" min="0" max="120" step="0.5" style="width:70px" />
+            <span class="unit">秒</span>
+          </div>
+          <div class="info-label">勾選後，導航／手動路線改為依序瞬移到每個你點選的路徑點，不再沿路徑步行。</div>
+        </div>
+
         <!-- Navigation -->
         <div class="group">
           <div class="group-title">導航路線</div>
