@@ -52,6 +52,15 @@
   const navLoop = $('navLoop');
   const btnCenter = $('btnCenter');
 
+  const randomRadius = $('randomRadius');
+  const randomCount = $('randomCount');
+  const randomLoop = $('randomLoop');
+  const randomLaps = $('randomLaps');
+  const btnRandomStart = $('btnRandomStart');
+  const btnRandomStop = $('btnRandomStop');
+  const btnRandomClear = $('btnRandomClear');
+  const randomLabel = $('randomLabel');
+
   const btnRouteMode = $('btnRouteMode');
   const btnRouteRedraw = $('btnRouteRedraw');
   const btnRouteStart = $('btnRouteStart');
@@ -59,6 +68,7 @@
   const btnRouteExport = $('btnRouteExport');
   const routeLoop = $('routeLoop');
   const routeLabel = $('routeLabel');
+  const savedRouteListEl = $('savedRouteList');
 
   const goldDittoAInput = $('goldDittoA');
   const btnGoldDittoStart = $('btnGoldDittoStart');
@@ -464,6 +474,7 @@
     navInfoLabel.textContent = '總距離: ' + data.dist_text + '\n預估時間: ' + data.time_text;
     mapCtrl.drawNavRoute(data.points);
     mapCtrl.updateNavInfo(data.dist_text + ' | ' + data.time_text);
+    saveRoute(data.points, 'nav');
 
     btnNavStart.disabled = false;
     btnNavPlan.disabled = false;
@@ -561,6 +572,97 @@
     mapCtrl.centerOnMarker();
   });
 
+  // ── Random walk (隨機散步) ──
+  const RANDOM_RADIUS_KEY = 'pikmingps.random.radius';
+  const RANDOM_COUNT_KEY = 'pikmingps.random.count';
+  const RANDOM_LOOP_KEY = 'pikmingps.random.loop';
+  const RANDOM_LAPS_KEY = 'pikmingps.random.laps';
+
+  try {
+    const r = localStorage.getItem(RANDOM_RADIUS_KEY);
+    const c = localStorage.getItem(RANDOM_COUNT_KEY);
+    const l = localStorage.getItem(RANDOM_LAPS_KEY);
+    if (r !== null) randomRadius.value = r;
+    if (c !== null) randomCount.value = c;
+    if (l !== null) randomLaps.value = l;
+    if (localStorage.getItem(RANDOM_LOOP_KEY) === '1') randomLoop.checked = true;
+  } catch (e) { /* ignore */ }
+
+  // 「自動循環散步」與「繞幾圈」只能選其一：勾選循環時停用圈數輸入。
+  function syncRandomMode() {
+    randomLaps.disabled = randomLoop.checked;
+  }
+  syncRandomMode();
+
+  randomRadius.addEventListener('change', function () {
+    try { localStorage.setItem(RANDOM_RADIUS_KEY, randomRadius.value); } catch (e) { /* ignore */ }
+  });
+  randomCount.addEventListener('change', function () {
+    try { localStorage.setItem(RANDOM_COUNT_KEY, randomCount.value); } catch (e) { /* ignore */ }
+  });
+  randomLaps.addEventListener('change', function () {
+    try { localStorage.setItem(RANDOM_LAPS_KEY, randomLaps.value); } catch (e) { /* ignore */ }
+  });
+  randomLoop.addEventListener('change', function () {
+    syncRandomMode();
+    try { localStorage.setItem(RANDOM_LOOP_KEY, randomLoop.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+
+  btnRandomStart.addEventListener('click', function () {
+    const radius = parseFloat(randomRadius.value) || 300;
+    const count = parseInt(randomCount.value, 10) || 5;
+    if (radius <= 0 || count <= 0) {
+      alert('方圓公尺與點數都要大於 0');
+      return;
+    }
+    const speed = parseFloat(speedInput.value) || 5;
+    const loop = randomLoop.checked;
+    const laps = parseInt(randomLaps.value, 10) || 1;
+    socket.emit('random_walk', Object.assign({ radius, count, speed, loop, laps }, getJumpParams()));
+    btnRandomStart.disabled = true;
+    btnRandomStop.disabled = false;
+    setActive(btnRandomStart, true);
+    walking = true;
+    mapCtrl.setAutoFollow(false);
+    randomLabel.textContent = '產生隨機路線中...';
+    setStatus('隨機散步：產生路線中...');
+  });
+
+  btnRandomStop.addEventListener('click', function () {
+    socket.emit('stop_walk');
+    btnRandomStart.disabled = false;
+    btnRandomStop.disabled = true;
+    setActive(btnRandomStart, false);
+    walking = false;
+    navRemainingLabel.textContent = '';
+    mapCtrl.setAutoFollow(true);
+    mapCtrl.updateNavInfo('');
+    setStatus('隨機散步已停止');
+  });
+
+  btnRandomClear.addEventListener('click', function () {
+    socket.emit('stop_walk');
+    btnRandomStart.disabled = false;
+    btnRandomStop.disabled = true;
+    setActive(btnRandomStart, false);
+    walking = false;
+    navRemainingLabel.textContent = '';
+    mapCtrl.clearNav();
+    mapCtrl.setAutoFollow(true);
+    mapCtrl.updateNavInfo('');
+    randomLabel.textContent = '以目前位置為中心，隨機產生數個點並自動導航散步。';
+    setStatus('已清除散步路徑');
+  });
+
+  socket.on('random_walk_ready', function (data) {
+    mapCtrl.clearNav();
+    mapCtrl.drawNavRoute(data.points);
+    mapCtrl.updateNavInfo(data.dist_text + ' | ' + data.time_text);
+    randomLabel.textContent = '方圓 ' + Math.round(data.radius) + ' 公尺內 ' + data.count +
+      ' 個點 · 總距離 ' + data.dist_text + ' · 預估 ' + data.time_text;
+    setStatus('隨機散步已開始：' + data.count + ' 個點');
+  });
+
   // ── Manual Route ──
   btnRouteMode.addEventListener('click', function () {
     if (!routeModeActive) {
@@ -584,6 +686,7 @@
         btnRouteRedraw.disabled = false;
         btnRouteExport.disabled = false;
         routeLabel.textContent = '路線: ' + routePoints.length + ' 個路徑點';
+        saveRoute(routePoints, 'manual');
       } else {
         routeLabel.textContent = '至少需要 2 個路徑點';
       }
@@ -654,6 +757,136 @@
     exportModal.classList.add('hidden');
   });
 
+  // ── Saved routes (自動儲存最近 5 條手動 / 導航路線) ──
+  const SAVED_ROUTES_KEY = 'pikmingps.savedroutes';
+  const SAVED_ROUTES_MAX = 5;
+  let savedRoutes = [];
+
+  try {
+    const raw = localStorage.getItem(SAVED_ROUTES_KEY);
+    if (raw) savedRoutes = JSON.parse(raw) || [];
+  } catch (e) { savedRoutes = []; }
+
+  function persistSavedRoutes() {
+    try { localStorage.setItem(SAVED_ROUTES_KEY, JSON.stringify(savedRoutes)); } catch (e) { /* ignore */ }
+  }
+
+  // type: 'manual'（手動路線）或 'nav'（導航路線）
+  function saveRoute(points, type) {
+    if (!points || points.length < 2) return;
+    const snapshot = points.map(function (p) { return [p[0], p[1]]; });
+    // 略過與最新一筆完全相同的路線
+    if (savedRoutes.length > 0 &&
+        savedRoutes[0].type === type &&
+        JSON.stringify(savedRoutes[0].points) === JSON.stringify(snapshot)) {
+      return;
+    }
+    savedRoutes.unshift({ points: snapshot, type: type === 'nav' ? 'nav' : 'manual', t: Date.now() });
+    if (savedRoutes.length > SAVED_ROUTES_MAX) savedRoutes = savedRoutes.slice(0, SAVED_ROUTES_MAX);
+    persistSavedRoutes();
+    renderSavedRoutes();
+  }
+
+  // 把一整條路線縮放成小縮圖（北方朝上），起點綠、終點紅
+  // 導航路線用綠線、手動路線用藍線，與地圖上一致
+  function makeRouteThumb(points, isNav) {
+    const W = 104, H = 56, pad = 6;
+    const lineColor = isNav ? '#00d977' : '#89b4fa';
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+    points.forEach(function (p) {
+      if (p[0] < minLat) minLat = p[0];
+      if (p[0] > maxLat) maxLat = p[0];
+      if (p[1] < minLng) minLng = p[1];
+      if (p[1] > maxLng) maxLng = p[1];
+    });
+    const rangeLat = (maxLat - minLat) || 1e-9;
+    const rangeLng = (maxLng - minLng) || 1e-9;
+    const scale = Math.min((W - 2 * pad) / rangeLng, (H - 2 * pad) / rangeLat);
+    const offX = (W - rangeLng * scale) / 2;
+    const offY = (H - rangeLat * scale) / 2;
+    const coords = points.map(function (p) {
+      const x = offX + (p[1] - minLng) * scale;
+      const y = H - offY - (p[0] - minLat) * scale; // 翻轉緯度，北方朝上
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    const first = coords[0].split(',');
+    const last = coords[coords.length - 1].split(',');
+    return '<svg class="route-thumb" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">' +
+      '<polyline points="' + coords.join(' ') + '" fill="none" stroke="' + lineColor + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + first[0] + '" cy="' + first[1] + '" r="3" fill="#a6e3a1"/>' +
+      '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="3" fill="#f38ba8"/>' +
+      '</svg>';
+  }
+
+  function renderSavedRoutes() {
+    savedRouteListEl.innerHTML = '';
+    if (savedRoutes.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'info-label';
+      empty.style.margin = '0';
+      empty.textContent = '完成手動或導航路線後會自動存於此（最多 5 條）';
+      savedRouteListEl.appendChild(empty);
+      return;
+    }
+    savedRoutes.forEach(function (r, i) {
+      const isNav = r.type === 'nav';
+      const item = document.createElement('div');
+      item.className = 'saved-route-item';
+      item.title = '點擊載入此路線到地圖';
+      item.innerHTML = makeRouteThumb(r.points, isNav);
+
+      const badge = document.createElement('span');
+      badge.className = 'saved-route-badge ' + (isNav ? 'nav' : 'manual');
+      badge.textContent = isNav ? '導航' : '手動';
+      item.appendChild(badge);
+
+      const meta = document.createElement('div');
+      meta.className = 'saved-route-meta';
+      const time = formatTime(r.t);
+      meta.innerHTML = '<span>' + r.points.length + ' 點</span>' +
+        (time ? '<span class="saved-route-time">' + time + '</span>' : '');
+      item.appendChild(meta);
+
+      const del = document.createElement('button');
+      del.className = 'saved-route-del';
+      del.textContent = '×';
+      del.title = '刪除此路線';
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        savedRoutes.splice(i, 1);
+        persistSavedRoutes();
+        renderSavedRoutes();
+      });
+      item.appendChild(del);
+
+      item.addEventListener('click', function () {
+        loadSavedRoute(r.points, isNav);
+      });
+      savedRouteListEl.appendChild(item);
+    });
+  }
+
+  // 把已存路線載回地圖（統一放進「手動路線」的路徑，可直接按「開始」行走）
+  function loadSavedRoute(points, isNav) {
+    socket.emit('stop_walk');
+    routeModeActive = false;
+    btnRouteMode.textContent = '繪製路線';
+    setActive(btnRouteMode, false);
+    mapCtrl.setRouteMode(false);
+    routePoints = mapCtrl.loadRoute(points, isNav);
+    btnRouteStart.disabled = routePoints.length < 2;
+    btnRouteStop.disabled = true;
+    setActive(btnRouteStop, false);
+    btnRouteRedraw.disabled = false;
+    btnRouteExport.disabled = routePoints.length < 1;
+    walking = false;
+    const kind = isNav ? '導航' : '手動';
+    routeLabel.textContent = '已載入' + kind + '路線: ' + routePoints.length + ' 個路徑點';
+    setStatus('已載入' + kind + '路線（可在地圖上縮放檢視，按「開始」即可行走）');
+  }
+
+  renderSavedRoutes();
+
   // ── Walk events ──
   socket.on('walk_started', function () {
     walking = true;
@@ -681,6 +914,9 @@
     btnRouteStart.disabled = routePoints.length < 2;
     btnRouteStop.disabled = true;
     setActive(btnRouteStop, false);
+    btnRandomStart.disabled = false;
+    btnRandomStop.disabled = true;
+    setActive(btnRandomStart, false);
     navRemainingLabel.textContent = '行走完成';
     mapCtrl.updateNavInfo('行走完成');
     mapCtrl.setAutoFollow(true);

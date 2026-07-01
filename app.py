@@ -13,7 +13,7 @@ from flask_socketio import SocketIO, emit
 from device import DeviceManager, log, log_exception
 from navigation import (
     fetch_osrm_route, parse_gpx, calculate_route_distance,
-    format_distance, format_duration, is_daytime,
+    format_distance, format_duration, is_daytime, generate_random_walk,
 )
 from route import RouteWalker
 
@@ -405,6 +405,83 @@ def handle_start_walk(data):
         emit("status", {"msg": f"點對點跳躍已開始 ({len(waypoints)} 個點)"})
     else:
         emit("status", {"msg": "行走已開始"})
+
+
+@socketio.on("random_walk")
+def handle_random_walk(data):
+    """隨機散步模式: generate `count` random points within `radius` metres of
+    the current position and auto-walk through them. Loops when requested."""
+    try:
+        radius = float(data.get("radius", 300))
+        count = int(data.get("count", 5))
+    except (TypeError, ValueError):
+        emit("status", {"msg": "隨機散步失敗: 方圓公尺 / 點數格式有誤"})
+        return
+
+    radius = max(1.0, min(radius, 50000.0))
+    count = max(1, min(count, 100))
+
+    speed = data.get("speed", 5.0)
+    loop = data.get("loop", False)
+    # 繞幾圈 (lap count). Mutually exclusive with loop — when auto-loop is on we
+    # ignore laps and walk forever; otherwise we walk the closed lap `laps` times.
+    try:
+        laps = int(data.get("laps", 1))
+    except (TypeError, ValueError):
+        laps = 1
+    laps = max(1, min(laps, 999))
+    jump_mode = data.get("jump_mode", False)
+    jump_pre = data.get("jump_pre_delay", 2.0)
+    jump_post = data.get("jump_post_delay", 4.0)
+
+    center_lat = state["lat"]
+    center_lng = state["lng"]
+
+    # base = [centre, p1..pk]. A single closed lap returns to the centre.
+    base = generate_random_walk(center_lat, center_lng, radius, count)
+
+    if loop:
+        # Walker loops the base route forever; it returns to centre each cycle.
+        walk_points = base
+    else:
+        # Repeat the route `laps` times and close the final lap back to centre.
+        walk_points = base * laps + [base[0]]
+
+    # The map only needs the base lap drawn; repeated laps overlap it exactly.
+    distance = calculate_route_distance(base)
+
+    state["nav_route_points"] = base
+    state["nav_waypoints"] = list(base)
+    state["nav_total_distance"] = distance
+
+    # Persist a backup copy of the route, matching handle_start_walk behaviour.
+    try:
+        with open(LAST_ROUTE_FILE, "w", encoding="utf-8") as f:
+            json.dump([[p[0], p[1]] for p in base], f, ensure_ascii=False, indent=2)
+    except Exception:
+        log_exception("Failed to save last_route.json")
+
+    speed_ms = speed * 1000.0 / 3600.0
+    eta = distance / speed_ms if speed_ms > 0 else 0
+
+    emit("random_walk_ready", {
+        "points": base,
+        "distance": distance,
+        "duration": eta,
+        "dist_text": format_distance(distance),
+        "time_text": format_duration(eta),
+        "count": len(base) - 1,
+        "radius": radius,
+    })
+
+    walker.set_waypoints([(p[0], p[1]) for p in walk_points])
+    walker.set_speed(speed)
+    walker.loop = loop
+    walker.set_jump(jump_mode, jump_pre, jump_post)
+    walker.start()
+    emit("walk_started")
+    mode_text = "（自動循環）" if loop else f"（繞 {laps} 圈）"
+    emit("status", {"msg": f"隨機散步已開始：方圓 {radius:.0f} 公尺內 {len(base) - 1} 個點{mode_text}"})
 
 
 @socketio.on("stop_walk")

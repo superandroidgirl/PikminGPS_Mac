@@ -122,6 +122,31 @@
           <div class="info-label">勾選後，導航／手動路線改為依序瞬移到每個你點選的路徑點，不再沿路徑步行。</div>
         </div>
 
+        <!-- Random walk (隨機散步) -->
+        <div class="group">
+          <div class="group-title">隨機散步</div>
+          <div class="row">
+            <label style="min-width:36px">方圓</label>
+            <input type="number" id="randomRadius" value="300" min="10" max="50000" step="10" style="width:80px" />
+            <span class="unit">公尺</span>
+            <label style="min-width:36px;margin-left:8px">隨機</label>
+            <input type="number" id="randomCount" value="5" min="1" max="100" step="1" style="width:60px" />
+            <span class="unit">個點</span>
+          </div>
+          <div class="row">
+            <label class="checkbox" style="flex:1"><input type="checkbox" id="randomLoop" /> 自動循環散步</label>
+            <label style="min-width:24px">繞</label>
+            <input type="number" id="randomLaps" value="1" min="1" max="999" step="1" style="width:60px" />
+            <span class="unit">圈</span>
+          </div>
+          <div class="row">
+            <button id="btnRandomStart" class="btn flex-1">產生並開始</button>
+            <button id="btnRandomStop" class="btn flex-1" disabled>停止散步</button>
+            <button id="btnRandomClear" class="btn flex-1">清除散步</button>
+          </div>
+          <div class="info-label" id="randomLabel">以目前位置為中心，隨機產生數個點並自動導航散步。</div>
+        </div>
+
         <!-- Navigation -->
         <div class="group">
           <div class="group-title">導航路線</div>
@@ -158,6 +183,13 @@
           </div>
           <label class="checkbox"><input type="checkbox" id="routeLoop" /> 循環路線</label>
           <div class="info-label" id="routeLabel">尚未設定路線</div>
+        </div>
+
+        <!-- Saved manual routes -->
+        <div class="group">
+          <div class="group-title">已存路線 (最近 5 條)</div>
+          <div id="savedRouteList" class="saved-route-list"></div>
+          <div class="info-label">完成手動路線或規劃導航路線會自動儲存（標示<span style="color:#89b4fa">手動</span>／<span style="color:#00d977">導航</span>），點縮圖即可載入地圖並自由縮放檢視。</div>
         </div>
 
         <!-- History coordinates -->
