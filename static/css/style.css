@@ -102,6 +102,13 @@ body {
   margin-bottom: 2px;
 }
 
+.title .version {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6c7086;
+  vertical-align: middle;
+}
+
 .subtitle {
   text-align: center;
   font-size: 11px;
