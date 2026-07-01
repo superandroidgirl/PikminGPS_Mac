@@ -317,6 +317,87 @@ select {
 .fav-item:hover { background: rgba(137,180,250,0.1); }
 .fav-item.selected { background: rgba(137,180,250,0.2); }
 
+.fav-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fav-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  /* 隱藏捲動軸，改用滑動標籤捲動 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.fav-tabs::-webkit-scrollbar { display: none; }
+
+.fav-tabs:focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 rgba(137,180,250,0.4);
+}
+
+.fav-tabs { cursor: grab; }
+.fav-tabs:active { cursor: grabbing; }
+
+.fav-tab {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #bac2de;
+  background: #313244;
+  border: 1px solid #505070;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fav-tab:hover { background: rgba(137,180,250,0.15); }
+
+.fav-tab.active {
+  color: #1e1e2e;
+  background: #89b4fa;
+  border-color: #89b4fa;
+  font-weight: 600;
+}
+
+/* 拖曳座標到分類標籤時的高亮 */
+.fav-tab.drop-target {
+  background: #a6e3a1;
+  border-color: #a6e3a1;
+  color: #1e1e2e;
+}
+
+.fav-item[draggable="true"] { cursor: grab; }
+.fav-item[draggable="true"]:active { cursor: grabbing; }
+
+/* 新增分類按鈕 */
+.fav-addcat {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #bac2de;
+  background: #313244;
+  border: 1px dashed #6c7086;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.fav-addcat:hover {
+  background: rgba(166,227,161,0.15);
+  border-color: #a6e3a1;
+  color: #a6e3a1;
+}
+
 /* ── Joystick ── */
 
 .joystick-container {

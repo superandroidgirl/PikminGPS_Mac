@@ -510,12 +510,24 @@ def handle_save_fav(data):
     name = data.get("name", "").strip()
     if not name:
         return
+    category = data.get("category", "").strip() or "未分類"
     state["favorites"].append({
         "name": name,
+        "category": category,
         "lat": state["lat"],
         "lng": state["lng"],
     })
     save_favorites()
+    emit("favorites_updated", {"favorites": state["favorites"]})
+
+
+@socketio.on("set_favorite_category")
+def handle_set_fav_cat(data):
+    idx = data.get("index", -1)
+    category = (data.get("category") or "").strip() or "未分類"
+    if 0 <= idx < len(state["favorites"]):
+        state["favorites"][idx]["category"] = category
+        save_favorites()
     emit("favorites_updated", {"favorites": state["favorites"]})
 
 

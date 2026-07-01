@@ -30,6 +30,14 @@
   const btnFavSave = $('btnFavSave');
   const btnFavDel = $('btnFavDel');
   const favListEl = $('favList');
+  const favTabsEl = $('favTabs');
+  const btnFavAddCat = $('btnFavAddCat');
+  const favModal = $('favModal');
+  const favNameInput = $('favNameInput');
+  const favCatSelect = $('favCatSelect');
+  const favCatInput = $('favCatInput');
+  const btnFavModalCancel = $('btnFavModalCancel');
+  const btnFavModalOk = $('btnFavModalOk');
 
   const historyListEl = $('historyList');
   const btnHistoryClear = $('btnHistoryClear');
@@ -90,6 +98,8 @@
   // ── State ──
   let favorites = [];
   let selectedFavIdx = -1;
+  let selectedCategory = '全部';
+  let extraCategories = [];  // 使用者手動新增、尚無座標的分類（僅在本次工作階段）
   let navModeActive = false;
   let routeModeActive = false;
   let routePoints = [];
@@ -112,6 +122,7 @@
       mapCtrl.setPosition(data.lat, data.lng);
       coordInput.value = data.lat.toFixed(6) + ', ' + data.lng.toFixed(6);
       favorites = data.favorites || [];
+      renderFavTabs();
       renderFavorites();
       if (data.is_day !== undefined) {
         mapCtrl.setDayNight(data.is_day);
@@ -289,12 +300,74 @@
   });
 
   // ── Favorites ──
+  // 已存在於座標中的分類
+  function favoriteCategories() {
+    const seen = [];
+    favorites.forEach(function (fav) {
+      const cat = fav.category || '未分類';
+      if (seen.indexOf(cat) === -1) seen.push(cat);
+    });
+    return seen;
+  }
+
+  // 所有可用分類 = 座標中的分類 + 手動新增的分類
+  function allCategories() {
+    const cats = favoriteCategories();
+    extraCategories.forEach(function (c) {
+      if (cats.indexOf(c) === -1) cats.push(c);
+    });
+    return cats;
+  }
+
+  function renderFavTabs() {
+    favTabsEl.innerHTML = '';
+    const cats = ['全部'].concat(allCategories());
+    if (cats.indexOf(selectedCategory) === -1) selectedCategory = '全部';
+    cats.forEach(function (cat) {
+      const tab = document.createElement('div');
+      tab.className = 'fav-tab' + (cat === selectedCategory ? ' active' : '');
+      tab.textContent = cat;
+      tab.addEventListener('click', function () {
+        selectedCategory = cat;
+        renderFavTabs();
+        renderFavorites();
+      });
+      // 「全部」不可作為拖曳目標（不是真正的分類）
+      if (cat !== '全部') {
+        tab.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          tab.classList.add('drop-target');
+        });
+        tab.addEventListener('dragleave', function () {
+          tab.classList.remove('drop-target');
+        });
+        tab.addEventListener('drop', function (e) {
+          e.preventDefault();
+          tab.classList.remove('drop-target');
+          const idx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          if (!isNaN(idx)) {
+            socket.emit('set_favorite_category', { index: idx, category: cat });
+          }
+        });
+      }
+      favTabsEl.appendChild(tab);
+    });
+  }
+
   function renderFavorites() {
     favListEl.innerHTML = '';
     favorites.forEach(function (fav, i) {
+      const cat = fav.category || '未分類';
+      if (selectedCategory !== '全部' && cat !== selectedCategory) return;
       const div = document.createElement('div');
       div.className = 'fav-item' + (i === selectedFavIdx ? ' selected' : '');
-      div.textContent = fav.name + '  (' + fav.lat.toFixed(6) + ', ' + fav.lng.toFixed(6) + ')';
+      div.textContent = fav.name;
+      div.title = '雙擊傳送到此座標，或拖曳到上方分類移動';
+      div.draggable = true;
+      div.addEventListener('dragstart', function (e) {
+        e.dataTransfer.setData('text/plain', String(i));
+        e.dataTransfer.effectAllowed = 'move';
+      });
       div.addEventListener('click', function () {
         selectedFavIdx = i;
         renderFavorites();
@@ -307,11 +380,122 @@
     });
   }
 
-  btnFavSave.addEventListener('click', function () {
-    const name = prompt('請輸入名稱:');
-    if (name && name.trim()) {
-      socket.emit('save_favorite', { name: name.trim() });
+  // ── 儲存地點彈窗（名稱 + 分類下拉選單 / 新分類） ──
+  function openFavModal() {
+    favNameInput.value = '';
+    favCatInput.value = '';
+    const cats = allCategories();
+    favCatSelect.innerHTML = '';
+    if (cats.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '未分類';
+      opt.textContent = '未分類';
+      favCatSelect.appendChild(opt);
+    } else {
+      cats.forEach(function (c) {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        favCatSelect.appendChild(opt);
+      });
     }
+    // 預設選中目前的分類標籤
+    if (selectedCategory !== '全部' && cats.indexOf(selectedCategory) !== -1) {
+      favCatSelect.value = selectedCategory;
+    }
+    favModal.classList.remove('hidden');
+    favNameInput.focus();
+  }
+
+  function closeFavModal() {
+    favModal.classList.add('hidden');
+  }
+
+  // 滑鼠滾輪轉為橫向捲動標籤（觸控板橫向滑動本身已支援）
+  favTabsEl.addEventListener('wheel', function (e) {
+    if (e.deltaY !== 0 && e.deltaX === 0) {
+      favTabsEl.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // 滑鼠按住拖曳左右捲動標籤
+  let tabDragging = false;
+  let tabStartX = 0;
+  let tabStartScroll = 0;
+  let tabMoved = false;
+
+  favTabsEl.addEventListener('mousedown', function (e) {
+    tabDragging = true;
+    tabMoved = false;
+    tabStartX = e.pageX;
+    tabStartScroll = favTabsEl.scrollLeft;
+  });
+
+  window.addEventListener('mousemove', function (e) {
+    if (!tabDragging) return;
+    const dx = e.pageX - tabStartX;
+    if (Math.abs(dx) > 3) tabMoved = true;
+    favTabsEl.scrollLeft = tabStartScroll - dx;
+    e.preventDefault();
+  });
+
+  window.addEventListener('mouseup', function () {
+    tabDragging = false;
+  });
+
+  // 拖曳過就不要觸發標籤點選（切換分類）
+  favTabsEl.addEventListener('click', function (e) {
+    if (tabMoved) {
+      e.stopPropagation();
+      e.preventDefault();
+      tabMoved = false;
+    }
+  }, true);
+
+  // 鍵盤左右方向鍵捲動標籤（需先點一下標籤列取得焦點）
+  favTabsEl.tabIndex = 0;
+  favTabsEl.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft') {
+      favTabsEl.scrollLeft -= 60;
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      favTabsEl.scrollLeft += 60;
+      e.preventDefault();
+    }
+  });
+
+  btnFavSave.addEventListener('click', openFavModal);
+  btnFavModalCancel.addEventListener('click', closeFavModal);
+
+  btnFavModalOk.addEventListener('click', function () {
+    const name = favNameInput.value.trim();
+    if (!name) {
+      favNameInput.focus();
+      return;
+    }
+    // 新輸入的分類優先，否則用下拉選單所選
+    const cat = favCatInput.value.trim() || favCatSelect.value || '未分類';
+    selectedCategory = cat;
+    socket.emit('save_favorite', { name: name, category: cat });
+    closeFavModal();
+  });
+
+  favNameInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') btnFavModalOk.click();
+  });
+
+  // 新增分類按鈕
+  btnFavAddCat.addEventListener('click', function () {
+    const name = prompt('請輸入新分類名稱:');
+    if (!name || !name.trim()) return;
+    const cat = name.trim();
+    if (extraCategories.indexOf(cat) === -1 && favoriteCategories().indexOf(cat) === -1) {
+      extraCategories.push(cat);
+    }
+    selectedCategory = cat;
+    renderFavTabs();
+    renderFavorites();
   });
 
   btnFavDel.addEventListener('click', function () {
@@ -323,6 +507,7 @@
 
   socket.on('favorites_updated', function (data) {
     favorites = data.favorites;
+    renderFavTabs();
     renderFavorites();
   });
 

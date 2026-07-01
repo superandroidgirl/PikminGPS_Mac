@@ -81,7 +81,10 @@
 
         <!-- Favorites -->
         <div class="group">
-          <div class="group-title">我的最愛</div>
+          <div class="fav-header">
+            <div id="favTabs" class="fav-tabs"></div>
+            <button id="btnFavAddCat" class="fav-addcat" title="新增分類">＋ 分類</button>
+          </div>
           <div id="favList" class="fav-list"></div>
           <div class="row">
             <button id="btnFavSave" class="btn flex-1">儲存目前位置</button>
@@ -253,6 +256,24 @@
       <div class="row" style="margin-top:12px;justify-content:flex-end;">
         <button id="btnExportCopy" class="btn">複製</button>
         <button id="btnExportClose" class="btn">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save favorite modal -->
+  <div id="favModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>儲存地點</h3>
+      <div class="info-label">名稱</div>
+      <input id="favNameInput" type="text" placeholder="地點名稱"
+        style="width:100%;box-sizing:border-box;margin-top:6px;" />
+      <div class="info-label" style="margin-top:12px;">分類</div>
+      <select id="favCatSelect" style="width:100%;box-sizing:border-box;margin-top:6px;"></select>
+      <input id="favCatInput" type="text" placeholder="或輸入新分類名稱"
+        style="width:100%;box-sizing:border-box;margin-top:6px;" />
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button id="btnFavModalCancel" class="btn">取消</button>
+        <button id="btnFavModalOk" class="btn">儲存</button>
       </div>
     </div>
   </div>
