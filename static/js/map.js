@@ -158,6 +158,37 @@ function initMap() {
 
   function getRoutePoints() { return routePoints.slice(); }
 
+  // 一次載入一整條路線（用於「已存路線」重新叫回地圖）
+  // isNav = true 時為導航路線（點很密），只在起點/終點放標記、用綠線
+  function loadRoute(points, isNav) {
+    clearRoute();
+    const color = isNav ? '#00d977' : '#3498db';
+    // 導航路線點過多，逐點畫圓會太雜，只標起點與終點
+    const showAllDots = !isNav && points.length <= 40;
+    points.forEach(function (p, i) {
+      routePoints.push([p[0], p[1]]);
+      const isEnd = i === 0 || i === points.length - 1;
+      if (showAllDots || isEnd) {
+        const m = L.circleMarker([p[0], p[1]], {
+          radius: isEnd ? 6 : 5,
+          color: color, fillColor: color, fillOpacity: 0.85,
+        }).addTo(map);
+        routeMarkers.push(m);
+      }
+    });
+    if (routeLine) map.removeLayer(routeLine);
+    if (routePoints.length > 1) {
+      routeLine = L.polyline(routePoints, {
+        color: color, weight: isNav ? 5 : 3,
+        opacity: 0.9, dashArray: isNav ? null : '8,8',
+      }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+    } else if (points.length === 1) {
+      map.setView(points[0], map.getZoom());
+    }
+    return getRoutePoints();
+  }
+
   // Navigation mode
   function setNavMode(enabled) {
     navMode = enabled;
@@ -217,14 +248,11 @@ function initMap() {
   }
 
   function setDayNight(isDay) {
-    if (isDay && isNightMode) {
+    // 永遠保持明亮的日間圖層，不隨當地時間變黑
+    if (isNightMode) {
       map.removeLayer(nightLayer);
       dayLayer.addTo(map);
       isNightMode = false;
-    } else if (!isDay && !isNightMode) {
-      map.removeLayer(dayLayer);
-      nightLayer.addTo(map);
-      isNightMode = true;
     }
   }
 
@@ -241,6 +269,7 @@ function initMap() {
     setRouteMode,
     clearRoute,
     getRoutePoints,
+    loadRoute,
     setNavMode,
     getNavWaypoints,
     drawNavRoute,

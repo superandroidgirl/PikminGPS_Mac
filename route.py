@@ -27,6 +27,12 @@ class RouteWalker:
         self.waypoints = []
         self.speed_kmh = 5.0
         self.loop = False
+        # Point-to-point jump mode: teleport between waypoints instead of
+        # walking the interpolated path. jump_pre_delay is the wait before
+        # each teleport, jump_post_delay the dwell after arriving.
+        self.jump_mode = False
+        self.jump_pre_delay = 2.0
+        self.jump_post_delay = 4.0
         self._current_segment = 0
         self._segment_progress = 0.0
         self._running = False
@@ -44,6 +50,13 @@ class RouteWalker:
 
     def set_speed(self, kmh: float):
         self.speed_kmh = max(0.5, min(kmh, 120.0))
+
+    def set_jump(self, enabled: bool, pre_delay: float = None, post_delay: float = None):
+        self.jump_mode = bool(enabled)
+        if pre_delay is not None:
+            self.jump_pre_delay = max(0.0, float(pre_delay))
+        if post_delay is not None:
+            self.jump_post_delay = max(0.0, float(post_delay))
 
     def start(self):
         if len(self.waypoints) < 2:
@@ -65,9 +78,75 @@ class RouteWalker:
         return self._running
 
     def _run(self):
+        if self.jump_mode:
+            self._run_jump()
+            return
         while self._running:
             self._step()
             time.sleep(1.0)
+
+    def _sleep_interruptible(self, seconds: float) -> bool:
+        """Sleep in short slices so a stop takes effect promptly.
+
+        Returns True if the full delay elapsed, False if stopped midway.
+        """
+        end = time.time() + max(0.0, seconds)
+        while self._running:
+            remaining = end - time.time()
+            if remaining <= 0:
+                return True
+            time.sleep(min(0.1, remaining))
+        return False
+
+    def _jump_remaining(self, index: int) -> float:
+        """Straight-line distance from waypoint *index* through the rest."""
+        remaining = 0.0
+        for j in range(index, len(self.waypoints) - 1):
+            p1 = self.waypoints[j]
+            p2 = self.waypoints[j + 1]
+            remaining += haversine_distance(p1[0], p1[1], p2[0], p2[1])
+        return remaining
+
+    def _run_jump(self):
+        """Teleport sequentially through each waypoint, pausing jump_pre_delay
+        seconds before each hop and jump_post_delay seconds after arriving.
+        Repeats from the first point when loop is enabled."""
+        n = len(self.waypoints)
+        while self._running:
+            for i in range(n):
+                if not self._running:
+                    return
+                # Wait before teleporting to this point.
+                if not self._sleep_interruptible(self.jump_pre_delay):
+                    return
+
+                lat, lng = self.waypoints[i]
+                if self.on_position:
+                    self.on_position(lat, lng)
+                if self.on_progress:
+                    self.on_progress(i, n - 1)
+
+                remaining = self._jump_remaining(i)
+                remaining_stops = (n - 1 - i)
+                if self.loop:
+                    remaining_stops = max(remaining_stops, 0)
+                remaining_time = remaining_stops * (self.jump_pre_delay + self.jump_post_delay)
+                if self.on_remaining:
+                    self.on_remaining(remaining, remaining_time)
+
+                is_last = (i == n - 1)
+                if is_last and not self.loop:
+                    continue
+                # Dwell at this point before moving on.
+                if not self._sleep_interruptible(self.jump_post_delay):
+                    return
+
+            if not self.loop:
+                break
+
+        self._running = False
+        if self.on_finished:
+            self.on_finished()
 
     def _step(self):
         with self._lock:

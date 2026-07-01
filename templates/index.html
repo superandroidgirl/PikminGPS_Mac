@@ -23,7 +23,7 @@
     <!-- Control Panel -->
     <div id="panel">
       <div class="panel-scroll">
-        <h1 class="title">PikminGPS</h1>
+        <h1 class="title">PikminGPS <span class="version">v2.0</span></h1>
         <p class="subtitle">macOS Web Edition</p>
 
         <!-- Device -->
@@ -57,26 +57,34 @@
         </div>
 
         <!-- Gold Ditto (拉金盆) -->
-        <div class="group goldditto-group">
-          <div class="group-title">🌼 金盆模式 (拉金盆)</div>
-          <div class="info-label goldditto-flow">
-            操作流程: 手動飛到金盆點開花苞，等待「在特殊花朵上往下滑動就能獲得獎勵」提示出來，再等 2 秒，再按下方「拉金盆」開始拉盆
+        <div class="group goldditto-group collapsed" id="goldDittoGroup">
+          <div class="group-title collapse-title" id="goldDittoToggle">
+            <span>🌼 金盆模式 (拉金盆)</span>
+            <span class="collapse-arrow">▾</span>
           </div>
-          <div class="row">
-            <label style="min-width:60px">A 座標:</label>
-            <input type="text" id="goldDittoA" placeholder="例: 25.034897, 121.545827" />
-            <button id="btnGoldDittoToggleHide" class="btn-icon" title="顯示/隱藏座標">👁</button>
-          </div>
-          <div class="info-label goldditto-hint">請填你目前真實位置的座標 (A 點)</div>
-          <div class="row">
-            <button id="btnGoldDittoUseCurrent" class="btn flex-1">使用目前位置</button>
-            <button id="btnGoldDittoStart" class="btn flex-1 btn-primary">拉金盆</button>
+          <div class="collapse-body">
+            <div class="info-label goldditto-flow">
+              操作流程: 手動飛到金盆點開花苞，等待「在特殊花朵上往下滑動就能獲得獎勵」提示出來，再等 2 秒，再按下方「拉金盆」開始拉盆
+            </div>
+            <div class="row">
+              <label style="min-width:60px">A 座標:</label>
+              <input type="text" id="goldDittoA" placeholder="例: 25.034897, 121.545827" />
+              <button id="btnGoldDittoToggleHide" class="btn-icon" title="顯示/隱藏座標">👁</button>
+            </div>
+            <div class="info-label goldditto-hint">請填你目前真實位置的座標 (A 點)</div>
+            <div class="row">
+              <button id="btnGoldDittoUseCurrent" class="btn flex-1">使用目前位置</button>
+              <button id="btnGoldDittoStart" class="btn flex-1 btn-primary">拉金盆</button>
+            </div>
           </div>
         </div>
 
         <!-- Favorites -->
         <div class="group">
-          <div class="group-title">我的最愛</div>
+          <div class="fav-header">
+            <div id="favTabs" class="fav-tabs"></div>
+            <button id="btnFavAddCat" class="fav-addcat" title="新增分類">＋ 分類</button>
+          </div>
           <div id="favList" class="fav-list"></div>
           <div class="row">
             <button id="btnFavSave" class="btn flex-1">儲存目前位置</button>
@@ -100,12 +108,54 @@
           </div>
         </div>
 
+        <!-- Point-to-point jump -->
+        <div class="group">
+          <div class="group-title">點對點跳躍</div>
+          <label class="checkbox"><input type="checkbox" id="jumpMode" /> 啟用逐點瞬移（不走路徑）</label>
+          <div class="row">
+            <label style="min-width:72px">跳躍前延遲</label>
+            <input type="number" id="jumpPreDelay" value="2" min="0" max="120" step="0.5" style="width:70px" />
+            <span class="unit">秒</span>
+          </div>
+          <div class="row">
+            <label style="min-width:72px">跳躍後延遲</label>
+            <input type="number" id="jumpPostDelay" value="4" min="0" max="120" step="0.5" style="width:70px" />
+            <span class="unit">秒</span>
+          </div>
+          <div class="info-label">勾選後，導航／手動路線改為依序瞬移到每個你點選的路徑點，不再沿路徑步行。</div>
+        </div>
+
+        <!-- Random walk (隨機散步) -->
+        <div class="group">
+          <div class="group-title">隨機散步</div>
+          <div class="row">
+            <label style="min-width:36px">方圓</label>
+            <input type="number" id="randomRadius" value="300" min="10" max="50000" step="10" style="width:80px" />
+            <span class="unit">公尺</span>
+            <label style="min-width:36px;margin-left:8px">隨機</label>
+            <input type="number" id="randomCount" value="5" min="1" max="100" step="1" style="width:60px" />
+            <span class="unit">個點</span>
+          </div>
+          <div class="row">
+            <label class="checkbox" style="flex:1"><input type="checkbox" id="randomLoop" /> 自動循環散步</label>
+            <label style="min-width:24px">繞</label>
+            <input type="number" id="randomLaps" value="1" min="1" max="999" step="1" style="width:60px" />
+            <span class="unit">圈</span>
+          </div>
+          <div class="row">
+            <button id="btnRandomStart" class="btn flex-1">產生並開始</button>
+            <button id="btnRandomStop" class="btn flex-1" disabled>停止散步</button>
+            <button id="btnRandomClear" class="btn flex-1">清除散步</button>
+          </div>
+          <div class="info-label" id="randomLabel">以目前位置為中心，隨機產生數個點並自動導航散步。</div>
+        </div>
+
         <!-- Navigation -->
         <div class="group">
           <div class="group-title">導航路線</div>
           <div class="row">
             <button id="btnNavMode" class="btn flex-1">導航規劃</button>
-            <button id="btnGpxImport" class="btn flex-1">匯入 GPX</button>
+            <button id="btnGpxImport" class="btn flex-1">貼上座標</button>
             <button id="btnNavPlan" class="btn flex-1" disabled>規劃路線</button>
           </div>
           <div class="info-label" id="navInfoLabel">點擊「導航規劃」設定路徑點</div>
@@ -132,9 +182,27 @@
           <div class="row">
             <button id="btnRouteStart" class="btn flex-1" disabled>開始</button>
             <button id="btnRouteStop" class="btn flex-1" disabled>停止</button>
+            <button id="btnRouteExport" class="btn flex-1" disabled>匯出座標</button>
           </div>
           <label class="checkbox"><input type="checkbox" id="routeLoop" /> 循環路線</label>
           <div class="info-label" id="routeLabel">尚未設定路線</div>
+        </div>
+
+        <!-- Saved manual routes -->
+        <div class="group">
+          <div class="group-title">已存路線 (最近 5 條)</div>
+          <div id="savedRouteList" class="saved-route-list"></div>
+          <div class="info-label">完成手動路線或規劃導航路線會自動儲存（標示<span style="color:#89b4fa">手動</span>／<span style="color:#00d977">導航</span>），點縮圖即可載入地圖並自由縮放檢視。</div>
+        </div>
+
+        <!-- History coordinates -->
+        <div class="group">
+          <div class="group-title">歷史座標</div>
+          <div id="historyList" class="fav-list"></div>
+          <div class="row">
+            <button id="btnHistoryClear" class="btn flex-1">清除紀錄</button>
+          </div>
+          <div class="info-label">最多保留 30 筆傳送紀錄，點擊任一項即可回溯（傳送回該座標）。</div>
         </div>
 
         <!-- Joystick -->
@@ -163,8 +231,52 @@
     </div>
   </div>
 
-  <!-- GPX file input (hidden) -->
-  <input type="file" id="gpxFileInput" accept=".gpx" style="display:none" />
+  <!-- Paste coordinates modal -->
+  <div id="coordsModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>貼上座標</h3>
+      <div class="info-label">每行一組 緯度,經度（lat,lng），例如：<br>50.579428,7.234302999999954</div>
+      <textarea id="coordsInput" rows="10" placeholder="座標1&#10;座標2&#10;"
+        style="width:100%;box-sizing:border-box;margin-top:8px;font-family:monospace;"></textarea>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+
+        <button id="btnCoordsCancel" class="btn">取消</button>
+        <button id="btnCoordsOk" class="btn">規劃軌跡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export coordinates modal -->
+  <div id="exportModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>匯出座標</h3>
+      <div class="info-label">目前路線的每個座標（緯度,經度）：</div>
+      <textarea id="exportOutput" rows="10" readonly
+        style="width:100%;box-sizing:border-box;margin-top:8px;font-family:monospace;"></textarea>
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button id="btnExportCopy" class="btn">複製</button>
+        <button id="btnExportClose" class="btn">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save favorite modal -->
+  <div id="favModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>儲存地點</h3>
+      <div class="info-label">名稱</div>
+      <input id="favNameInput" type="text" placeholder="地點名稱"
+        style="width:100%;box-sizing:border-box;margin-top:6px;" />
+      <div class="info-label" style="margin-top:12px;">分類</div>
+      <select id="favCatSelect" style="width:100%;box-sizing:border-box;margin-top:6px;"></select>
+      <input id="favCatInput" type="text" placeholder="或輸入新分類名稱"
+        style="width:100%;box-sizing:border-box;margin-top:6px;" />
+      <div class="row" style="margin-top:12px;justify-content:flex-end;">
+        <button id="btnFavModalCancel" class="btn">取消</button>
+        <button id="btnFavModalOk" class="btn">儲存</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>

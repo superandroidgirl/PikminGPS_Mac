@@ -1,12 +1,48 @@
 """Navigation routing (OSRM) and GPX import."""
 import json
 import math
+import random
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 from route import haversine_distance
+
+
+def generate_random_walk(lat, lng, radius_m, count):
+    """Build a strolling route of `count` random points within `radius_m`
+    metres of (lat, lng), starting from the centre.
+
+    Points are distributed uniformly over the disc, then ordered by a simple
+    nearest-neighbour heuristic so the stroll flows smoothly instead of
+    zig-zagging back and forth across the centre.
+    Returns a list of (lat, lng) tuples beginning with the centre point.
+    """
+    meters_per_deg_lat = 111320.0
+    meters_per_deg_lng = 111320.0 * math.cos(math.radians(lat))
+    if abs(meters_per_deg_lng) < 1e-6:
+        meters_per_deg_lng = 1e-6
+
+    pts = []
+    for _ in range(count):
+        # sqrt() gives a uniform distribution over the area, not clustered at centre
+        d = radius_m * math.sqrt(random.random())
+        theta = random.random() * 2 * math.pi
+        dlat = (d * math.cos(theta)) / meters_per_deg_lat
+        dlng = (d * math.sin(theta)) / meters_per_deg_lng
+        pts.append((lat + dlat, lng + dlng))
+
+    ordered = []
+    cur = (lat, lng)
+    remaining = list(pts)
+    while remaining:
+        remaining.sort(key=lambda p: haversine_distance(cur[0], cur[1], p[0], p[1]))
+        nxt = remaining.pop(0)
+        ordered.append(nxt)
+        cur = nxt
+
+    return [(lat, lng)] + ordered
 
 
 def fetch_osrm_route(waypoints, profile="foot"):

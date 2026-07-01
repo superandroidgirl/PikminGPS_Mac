@@ -102,6 +102,13 @@ body {
   margin-bottom: 2px;
 }
 
+.title .version {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6c7086;
+  vertical-align: middle;
+}
+
 .subtitle {
   text-align: center;
   font-size: 11px;
@@ -317,6 +324,87 @@ select {
 .fav-item:hover { background: rgba(137,180,250,0.1); }
 .fav-item.selected { background: rgba(137,180,250,0.2); }
 
+.fav-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fav-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  /* 隱藏捲動軸，改用滑動標籤捲動 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.fav-tabs::-webkit-scrollbar { display: none; }
+
+.fav-tabs:focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 rgba(137,180,250,0.4);
+}
+
+.fav-tabs { cursor: grab; }
+.fav-tabs:active { cursor: grabbing; }
+
+.fav-tab {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #bac2de;
+  background: #313244;
+  border: 1px solid #505070;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fav-tab:hover { background: rgba(137,180,250,0.15); }
+
+.fav-tab.active {
+  color: #1e1e2e;
+  background: #89b4fa;
+  border-color: #89b4fa;
+  font-weight: 600;
+}
+
+/* 拖曳座標到分類標籤時的高亮 */
+.fav-tab.drop-target {
+  background: #a6e3a1;
+  border-color: #a6e3a1;
+  color: #1e1e2e;
+}
+
+.fav-item[draggable="true"] { cursor: grab; }
+.fav-item[draggable="true"]:active { cursor: grabbing; }
+
+/* 新增分類按鈕 */
+.fav-addcat {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #bac2de;
+  background: #313244;
+  border: 1px dashed #6c7086;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.fav-addcat:hover {
+  background: rgba(166,227,161,0.15);
+  border-color: #a6e3a1;
+  color: #a6e3a1;
+}
+
 /* ── Joystick ── */
 
 .joystick-container {
@@ -401,6 +489,39 @@ select {
   color: #f9e2af;
 }
 
+/* ── Collapsible group ── */
+
+.collapse-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 8px;
+}
+
+.collapse-arrow {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.15s;
+}
+
+.collapse-body {
+  overflow: hidden;
+}
+
+.collapsed .collapse-title {
+  margin-bottom: 0;
+}
+
+.collapsed .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
+.collapsed .collapse-body {
+  display: none;
+}
+
 .goldditto-flow {
   font-size: 11px;
   line-height: 1.5;
@@ -441,6 +562,81 @@ select {
   border-color: #3a3220;
   border-bottom: 2px solid #1f1a10;
 }
+
+/* ── Saved manual routes ── */
+
+.saved-route-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.saved-route-item {
+  position: relative;
+  width: calc(50% - 3px);
+  background: linear-gradient(to bottom, #282838, #313244);
+  border: 1px solid #505070;
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+  transition: border-color 0.1s;
+}
+
+.saved-route-item:hover { border-color: #89b4fa; }
+
+.route-thumb {
+  display: block;
+  width: 100%;
+  height: 56px;
+  background: #1e1e2e;
+  border-radius: 4px;
+}
+
+.saved-route-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #a6adc8;
+  margin-top: 3px;
+  padding: 0 2px;
+}
+
+.saved-route-time { color: #6c7086; }
+
+.saved-route-badge {
+  position: absolute;
+  top: 6px; left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #1e1e2e;
+  pointer-events: none;
+}
+
+.saved-route-badge.manual { background: #89b4fa; }
+.saved-route-badge.nav { background: #00d977; }
+
+.saved-route-del {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 16px; height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(30,30,46,0.85);
+  color: #f38ba8;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.saved-route-item:hover .saved-route-del { opacity: 1; }
 
 @media (max-width: 800px) {
   #app { flex-direction: column; }
