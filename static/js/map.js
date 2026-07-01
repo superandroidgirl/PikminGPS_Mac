@@ -217,14 +217,11 @@ function initMap() {
   }
 
   function setDayNight(isDay) {
-    if (isDay && isNightMode) {
+    // 永遠保持明亮的日間圖層，不隨當地時間變黑
+    if (isNightMode) {
       map.removeLayer(nightLayer);
       dayLayer.addTo(map);
       isNightMode = false;
-    } else if (!isDay && !isNightMode) {
-      map.removeLayer(dayLayer);
-      nightLayer.addTo(map);
-      isNightMode = true;
     }
   }
 
