@@ -31,6 +31,9 @@
   const btnFavDel = $('btnFavDel');
   const favListEl = $('favList');
 
+  const historyListEl = $('historyList');
+  const btnHistoryClear = $('btnHistoryClear');
+
   const speedPreset = $('speedPreset');
   const speedInput = $('speedInput');
 
@@ -109,6 +112,7 @@
   mapCtrl.callbacks.onMapClick = function (lat, lng) {
     coordInput.value = lat.toFixed(6) + ', ' + lng.toFixed(6);
     socket.emit('teleport', { lat, lng });
+    recordHistory(lat, lng);
   };
 
   mapCtrl.callbacks.onRoutePoint = function (lat, lng, idx) {
@@ -256,6 +260,7 @@
     }
     mapCtrl.setPosition(lat, lng);
     socket.emit('teleport', { lat, lng });
+    recordHistory(lat, lng);
   }
 
   btnTeleport.addEventListener('click', doTeleport);
@@ -286,6 +291,7 @@
       });
       div.addEventListener('dblclick', function () {
         socket.emit('goto_favorite', { index: i });
+        recordHistory(fav.lat, fav.lng);
       });
       favListEl.appendChild(div);
     });
@@ -309,6 +315,78 @@
     favorites = data.favorites;
     renderFavorites();
   });
+
+  // ── History coordinates (最多 30 筆傳送紀錄，可回溯) ──
+  const HISTORY_KEY = 'pikmingps.history';
+  const HISTORY_MAX = 30;
+  let history = [];
+
+  try {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    if (saved) history = JSON.parse(saved) || [];
+  } catch (e) { history = []; }
+
+  function saveHistory() {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) { /* ignore */ }
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const p = n => ('0' + n).slice(-2);
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function renderHistory() {
+    historyListEl.innerHTML = '';
+    if (history.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'fav-item';
+      empty.style.color = '#6c7086';
+      empty.style.cursor = 'default';
+      empty.textContent = '尚無歷史座標';
+      historyListEl.appendChild(empty);
+      return;
+    }
+    history.forEach(function (h) {
+      const div = document.createElement('div');
+      div.className = 'fav-item';
+      const time = formatTime(h.t);
+      div.textContent = (time ? time + '  ' : '') + h.lat.toFixed(6) + ', ' + h.lng.toFixed(6);
+      div.title = '點擊回溯到此座標';
+      div.addEventListener('click', function () {
+        mapCtrl.setPosition(h.lat, h.lng);
+        socket.emit('teleport', { lat: h.lat, lng: h.lng });
+        coordInput.value = h.lat.toFixed(6) + ', ' + h.lng.toFixed(6);
+        setStatus('已回溯到歷史座標: ' + h.lat.toFixed(6) + ', ' + h.lng.toFixed(6));
+      });
+      historyListEl.appendChild(div);
+    });
+  }
+
+  function recordHistory(lat, lng) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+    // 略過與最新一筆幾乎相同的座標（約 1 公尺內）
+    if (history.length > 0) {
+      const last = history[0];
+      if (Math.abs(last.lat - lat) < 1e-5 && Math.abs(last.lng - lng) < 1e-5) return;
+    }
+    history.unshift({ lat: lat, lng: lng, t: Date.now() });
+    if (history.length > HISTORY_MAX) history = history.slice(0, HISTORY_MAX);
+    saveHistory();
+    renderHistory();
+  }
+
+  btnHistoryClear.addEventListener('click', function () {
+    if (history.length === 0) return;
+    if (!confirm('確定要清除所有歷史座標嗎？')) return;
+    history = [];
+    saveHistory();
+    renderHistory();
+    setStatus('已清除歷史座標');
+  });
+
+  renderHistory();
 
   // ── Speed ──
   speedPreset.addEventListener('change', function () {
@@ -612,6 +690,23 @@
   // ── Gold Ditto (拉金盆) ──
   const GD_A_KEY = 'pikmingps.goldditto.a';
   const GD_HIDDEN_KEY = 'pikmingps.goldditto.a_hidden';
+  const GD_COLLAPSED_KEY = 'pikmingps.goldditto.collapsed';
+
+  // Collapsible group
+  const goldDittoGroup = $('goldDittoGroup');
+  const goldDittoToggle = $('goldDittoToggle');
+  if (goldDittoGroup && goldDittoToggle) {
+    try {
+      // Collapsed by default to save space; expand only if the user chose to.
+      if (localStorage.getItem(GD_COLLAPSED_KEY) === '0') {
+        goldDittoGroup.classList.remove('collapsed');
+      }
+    } catch (e) { /* ignore */ }
+    goldDittoToggle.addEventListener('click', function () {
+      const collapsed = goldDittoGroup.classList.toggle('collapsed');
+      try { localStorage.setItem(GD_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) { /* ignore */ }
+    });
+  }
 
   try {
     const saved = localStorage.getItem(GD_A_KEY);

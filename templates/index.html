@@ -57,20 +57,25 @@
         </div>
 
         <!-- Gold Ditto (拉金盆) -->
-        <div class="group goldditto-group">
-          <div class="group-title">🌼 金盆模式 (拉金盆)</div>
-          <div class="info-label goldditto-flow">
-            操作流程: 手動飛到金盆點開花苞，等待「在特殊花朵上往下滑動就能獲得獎勵」提示出來，再等 2 秒，再按下方「拉金盆」開始拉盆
+        <div class="group goldditto-group collapsed" id="goldDittoGroup">
+          <div class="group-title collapse-title" id="goldDittoToggle">
+            <span>🌼 金盆模式 (拉金盆)</span>
+            <span class="collapse-arrow">▾</span>
           </div>
-          <div class="row">
-            <label style="min-width:60px">A 座標:</label>
-            <input type="text" id="goldDittoA" placeholder="例: 25.034897, 121.545827" />
-            <button id="btnGoldDittoToggleHide" class="btn-icon" title="顯示/隱藏座標">👁</button>
-          </div>
-          <div class="info-label goldditto-hint">請填你目前真實位置的座標 (A 點)</div>
-          <div class="row">
-            <button id="btnGoldDittoUseCurrent" class="btn flex-1">使用目前位置</button>
-            <button id="btnGoldDittoStart" class="btn flex-1 btn-primary">拉金盆</button>
+          <div class="collapse-body">
+            <div class="info-label goldditto-flow">
+              操作流程: 手動飛到金盆點開花苞，等待「在特殊花朵上往下滑動就能獲得獎勵」提示出來，再等 2 秒，再按下方「拉金盆」開始拉盆
+            </div>
+            <div class="row">
+              <label style="min-width:60px">A 座標:</label>
+              <input type="text" id="goldDittoA" placeholder="例: 25.034897, 121.545827" />
+              <button id="btnGoldDittoToggleHide" class="btn-icon" title="顯示/隱藏座標">👁</button>
+            </div>
+            <div class="info-label goldditto-hint">請填你目前真實位置的座標 (A 點)</div>
+            <div class="row">
+              <button id="btnGoldDittoUseCurrent" class="btn flex-1">使用目前位置</button>
+              <button id="btnGoldDittoStart" class="btn flex-1 btn-primary">拉金盆</button>
+            </div>
           </div>
         </div>
 
@@ -153,6 +158,16 @@
           </div>
           <label class="checkbox"><input type="checkbox" id="routeLoop" /> 循環路線</label>
           <div class="info-label" id="routeLabel">尚未設定路線</div>
+        </div>
+
+        <!-- History coordinates -->
+        <div class="group">
+          <div class="group-title">歷史座標</div>
+          <div id="historyList" class="fav-list"></div>
+          <div class="row">
+            <button id="btnHistoryClear" class="btn flex-1">清除紀錄</button>
+          </div>
+          <div class="info-label">最多保留 30 筆傳送紀錄，點擊任一項即可回溯（傳送回該座標）。</div>
         </div>
 
         <!-- Joystick -->

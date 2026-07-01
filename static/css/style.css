@@ -401,6 +401,39 @@ select {
   color: #f9e2af;
 }
 
+/* ── Collapsible group ── */
+
+.collapse-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 8px;
+}
+
+.collapse-arrow {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.15s;
+}
+
+.collapse-body {
+  overflow: hidden;
+}
+
+.collapsed .collapse-title {
+  margin-bottom: 0;
+}
+
+.collapsed .collapse-arrow {
+  transform: rotate(-90deg);
+}
+
+.collapsed .collapse-body {
+  display: none;
+}
+
 .goldditto-flow {
   font-size: 11px;
   line-height: 1.5;
