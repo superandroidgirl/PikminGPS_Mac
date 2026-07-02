@@ -117,6 +117,21 @@ iOS 17 起，Apple 將裝置除錯通道改為需要 root 權限的網路通道�
 4. 連線方式選擇 **WiFi**
 5. 點擊「**連接 iPhone**」
 
+### 在新電腦上啟用 WiFi 模式（每台電腦都要做一次）
+
+WiFi 模式依賴一把「遠端配對金鑰」（`~/.pymobiledevice3/remote_<UDID>.plist`）。
+這把金鑰是**每台電腦各自建立**的，不會隨 app、DMG 或專案資料夾複製，
+也**不能從別台電腦複製過來**（手機只認當初配對的那台電腦）。
+
+所以換一台新電腦時，第一次必須：
+
+1. iPhone **解鎖**並用 **USB** 接上新電腦，點「信任此電腦」
+2. 啟動 iOS 17+ 通道（app 內按鈕，或終端機 `sudo … remote tunneld`）
+3. **保持 USB 插著 30~60 秒**，等 `~/.pymobiledevice3/remote_<UDID>.plist` 出現
+4. 之後拔掉 USB 就能用 WiFi 模式了（每支 iPhone 各需自己的金鑰）
+
+連不上時執行 `./diagnose_wifi.sh`，會逐項檢查金鑰、網路、通道並指出卡在哪一步。
+
 ### 連線成功
 
 面板上會顯示裝置資訊，例如：
@@ -358,6 +373,9 @@ iPhone 15 Pro | iOS 17.4 (Tunnel+DVT)
 - iPhone 和 Mac 必須在同一個 WiFi 網路
 - iPhone 需要事先透過 USB 配對過此 Mac
 - iOS 17+ 通道啟動後需要等待約 5~10 秒才能發現 WiFi 裝置
+- **換了電腦？** 每台電腦都要先「USB 插線 + 通道執行 30~60 秒」建立 WiFi 配對金鑰
+  （`~/.pymobiledevice3/remote_*.plist`），金鑰不會隨 app 複製（見上方「在新電腦上啟用 WiFi 模式」）
+- 執行 `./diagnose_wifi.sh` 可自動找出卡在哪一步（金鑰、防火牆、AP 隔離、通道…）
 
 ### Q: 傳送位置後 iPhone 上沒有變化？
 

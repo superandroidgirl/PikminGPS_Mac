@@ -1,4 +1,5 @@
 """PikminGPS Web — Flask + Socket.IO backend for macOS."""
+import getpass
 import json
 import os
 import socket
@@ -142,7 +143,11 @@ def start_tunneld():
 
     exe = sys.executable.replace('"', '\\"')
     log_path = "/tmp/pikmin_tunneld.log"
-    shell_cmd = f'nohup "{exe}" --tunneld > {log_path} 2>&1 &'
+    # osascript 以 root 執行且沒有 SUDO_USER，pymobiledevice3 會把 WiFi 配對金鑰
+    # 存到 /var/root/.pymobiledevice3；帶入 SUDO_USER 讓金鑰統一存到使用者家目錄，
+    # 與 Terminal `sudo` 啟動的 tunneld 讀同一份。
+    sudo_user = getpass.getuser()
+    shell_cmd = f'nohup env SUDO_USER={sudo_user} "{exe}" --tunneld > {log_path} 2>&1 &'
     osa = (
         f'do shell script "{shell_cmd}" '
         f'with administrator privileges '

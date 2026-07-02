@@ -70,8 +70,89 @@ else
     PROBLEMS=$((PROBLEMS+1))
 fi
 
-# ---- 4. 開發者模式 ----
-step "4. 開發者模式 / 解鎖狀態"
+# ---- 4. WiFi 遠端配對金鑰 (remote_*.plist) ----
+# tunneld 的 WiFi 探索只會連「已有遠端配對金鑰」的裝置。
+# 金鑰是每台電腦各自建立的，不會隨 app / 專案資料夾複製。
+step "4. WiFi 遠端配對金鑰 (remote_*.plist)"
+USER_KEY_DIR="$HOME/.pymobiledevice3"
+ROOT_KEY_DIR="/var/root/.pymobiledevice3"
+USER_KEYS=$(ls "$USER_KEY_DIR"/remote_*.plist 2>/dev/null)
+ROOT_KEYS=""
+if sudo -n true 2>/dev/null; then
+    ROOT_KEYS=$(sudo -n ls "$ROOT_KEY_DIR"/remote_*.plist 2>/dev/null)
+    ROOT_CHECKED=1
+else
+    ROOT_CHECKED=0
+fi
+
+if [ -n "$USER_KEYS" ]; then
+    ok "使用者金鑰 ($USER_KEY_DIR):"
+    for k in $USER_KEYS; do echo "     - $(basename "$k")"; done
+fi
+if [ -n "$ROOT_KEYS" ]; then
+    ok "root 金鑰 ($ROOT_KEY_DIR):"
+    for k in $ROOT_KEYS; do echo "     - $(basename "$k")"; done
+fi
+
+if [ -z "$USER_KEYS" ] && [ -z "$ROOT_KEYS" ]; then
+    bad "這台電腦沒有 WiFi 配對金鑰 (remote_<UDID>.plist) ← WiFi 連不到的根本原因"
+    echo "      建立方式（每台電腦做一次）："
+    echo "      1. iPhone 解鎖、USB 接上"
+    echo "      2. sudo $PMD -m pymobiledevice3 remote tunneld --host 127.0.0.1 --port 49151"
+    echo "      3. 保持插線等 30~60 秒，直到 $USER_KEY_DIR/remote_*.plist 出現"
+    echo "      4. 拔線後即可走 WiFi（金鑰不能從別台電腦複製過來）"
+    if [ "$ROOT_CHECKED" -eq 0 ]; then
+        warn "無法檢查 $ROOT_KEY_DIR（需要 sudo），可手動確認: sudo ls $ROOT_KEY_DIR/"
+    fi
+    PROBLEMS=$((PROBLEMS+1))
+else
+    # 金鑰位置必須和 tunneld 啟動方式一致：
+    # Terminal sudo 啟動 → 讀 ~/.pymobiledevice3；app 按鈕 (osascript) 啟動 → 讀 /var/root/.pymobiledevice3
+    if [ -z "$USER_KEYS" ] && [ -n "$ROOT_KEYS" ]; then
+        warn "金鑰只在 $ROOT_KEY_DIR → 用 Terminal sudo 啟動的 tunneld 會讀不到"
+        echo "      可複製到使用者目錄: sudo cp $ROOT_KEY_DIR/remote_*.plist $USER_KEY_DIR/"
+    elif [ -n "$USER_KEYS" ] && [ "$ROOT_CHECKED" -eq 1 ] && [ -z "$ROOT_KEYS" ]; then
+        warn "金鑰只在 $USER_KEY_DIR → 若用 app 按鈕啟動 tunneld（osascript）可能讀不到（新版已修正）"
+    fi
+    # UDID 比對：金鑰要屬於目前偵測到的手機
+    if [ "$DEVCOUNT" -ge 1 ] 2>/dev/null; then
+        DETECTED_UDIDS=$(echo "$DEVLIST" | $PMD -c "import sys,json
+for d in json.load(sys.stdin): print(d.get('UniqueDeviceID',''))" 2>/dev/null)
+        for k in $USER_KEYS $ROOT_KEYS; do
+            KUDID=$(basename "$k" .plist); KUDID=${KUDID#remote_}
+            if ! echo "$DETECTED_UDIDS" | grep -qi "$KUDID"; then
+                warn "金鑰 $(basename "$k") 不屬於目前偵測到的手機（每支手機各需自己的金鑰）"
+            fi
+        done
+    fi
+fi
+
+# 金鑰失效跡象：tunneld log 反覆略過配對
+if [ -f /tmp/pikmin_tunneld.log ] && grep -qE "PairingError|Skipping remote pairing" /tmp/pikmin_tunneld.log 2>/dev/null; then
+    warn "tunneld log 出現配對錯誤 (PairingError / Skipping remote pairing)"
+    echo "      金鑰可能失效或手機已重置信任 → 刪除該 remote_*.plist 後重新 USB 配對"
+fi
+
+# ---- 5. 手機是否在網路上廣播 WiFi 配對服務 (mDNS) ----
+step "5. 手機 WiFi 配對服務廣播 (mDNS)"
+RP_OUT="/tmp/pikmin_rp_browse.$$"
+(dns-sd -B _remotepairing._tcp local. > "$RP_OUT" 2>&1 &)
+sleep 8
+pkill -f "dns-sd -B _remotepairing" 2>/dev/null
+if grep -q "^..:.*Add" "$RP_OUT" 2>/dev/null; then
+    ok "網路上找得到手機的 WiFi 配對服務："
+    grep "Add" "$RP_OUT" | awk '{print "     -", $NF}'
+else
+    bad "網路上找不到手機的配對服務 (_remotepairing._tcp) ← tunneld 也會找不到"
+    echo "      請檢查：Mac 防火牆（系統設定>網路>防火牆，暫時關閉測試）、"
+    echo "      訪客/公司 WiFi 的裝置隔離 (AP isolation)、Mac 或手機的 VPN、"
+    echo "      手機是否解鎖且連上同一個 WiFi"
+    PROBLEMS=$((PROBLEMS+1))
+fi
+rm -f "$RP_OUT"
+
+# ---- 6. 開發者模式 ----
+step "6. 開發者模式 / 解鎖狀態"
 DEVMODE=$($PMD -m pymobiledevice3 lockdown info 2>/dev/null | grep -i "DeveloperMode" | head -1)
 PRODVER=$($PMD -m pymobiledevice3 lockdown info 2>/dev/null | grep -i "ProductVersion" | head -1)
 if [ -n "$PRODVER" ]; then
@@ -85,8 +166,8 @@ else
     warn "拿不到 lockdown info（裝置沒接 USB、沒配對、或螢幕鎖著）"
 fi
 
-# ---- 5. tunneld 是否在跑 + 健康檢查 ----
-step "5. tunneld 通道狀態 (port 49151)"
+# ---- 7. tunneld 是否在跑 + 健康檢查 ----
+step "7. tunneld 通道狀態 (port 49151)"
 HELLO=$(curl -s --max-time 4 http://127.0.0.1:49151/hello 2>/dev/null)
 if [ -n "$HELLO" ] || curl -s --max-time 4 -o /dev/null -w "%{http_code}" http://127.0.0.1:49151/hello 2>/dev/null | grep -q "200"; then
     ok "tunneld 有回應 (/hello)"
@@ -96,8 +177,8 @@ else
     PROBLEMS=$((PROBLEMS+1))
 fi
 
-# ---- 6. tunneld 通道內有沒有發現手機 ----
-step "6. tunneld 是否已發現你的手機"
+# ---- 8. tunneld 通道內有沒有發現手機 ----
+step "8. tunneld 是否已發現你的手機"
 TUN=$(curl -s --max-time 5 http://127.0.0.1:49151/ 2>/dev/null)
 TUNCOUNT=$(echo "$TUN" | $PMD -c "import sys,json
 try:
@@ -111,8 +192,8 @@ else
     PROBLEMS=$((PROBLEMS+1))
 fi
 
-# ---- 7. anaconda/系統 python 跑著舊 tunneld 的衝突提醒 ----
-step "7. 環境衝突檢查"
+# ---- 9. anaconda/系統 python 跑著舊 tunneld 的衝突提醒 ----
+step "9. 環境衝突檢查"
 RUNNING_TUN=$(ps aux | grep "[r]emote tunneld" | grep -v grep)
 if echo "$RUNNING_TUN" | grep -q "anaconda"; then
     warn "目前的 tunneld 是用 anaconda 跑的，但 app 用的是 $PMD"

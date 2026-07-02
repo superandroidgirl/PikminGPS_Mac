@@ -1,5 +1,6 @@
 """iOS device communication via pymobiledevice3 — macOS version."""
 import asyncio
+import glob
 import logging
 import os
 import shutil
@@ -278,13 +279,30 @@ class DeviceManager:
             return info
         except Exception as e:
             log_exception("WiFi tunneld connection failed")
-            raise ConnectionError(
-                f"WiFi 連線失敗: {e}\n"
-                "請確認：\n"
-                "1. iPhone 和電腦在同一個 WiFi 網路\n"
-                "2. iPhone 之前曾透過 USB 配對過\n"
-                "3. tunneld 正在執行中"
+            # WiFi 探索只認這台電腦自己的遠端配對金鑰 (remote_<UDID>.plist)，
+            # 依金鑰檔存在與否給不同的排查指引。
+            has_pair_record = bool(
+                glob.glob(os.path.expanduser("~/.pymobiledevice3/remote_*.plist"))
             )
+            if has_pair_record:
+                hint = (
+                    "這台電腦已有 WiFi 配對金鑰，請檢查：\n"
+                    "1. iPhone 和電腦在同一個 WiFi 網路（且無 AP 隔離 / VPN）\n"
+                    "2. Mac 防火牆沒有擋住連線\n"
+                    "3. tunneld 正在執行中\n"
+                    "4. 金鑰是否失效（tunneld log 出現 PairingError 時，"
+                    "刪除 ~/.pymobiledevice3/remote_*.plist 後重新 USB 配對）\n"
+                    "可執行 ./diagnose_wifi.sh 逐項檢查"
+                )
+            else:
+                hint = (
+                    "這台電腦還沒有 WiFi 配對金鑰 (~/.pymobiledevice3/remote_*.plist)，"
+                    "每台電腦都要建立一次：\n"
+                    "1. iPhone 解鎖並用 USB 接上\n"
+                    "2. 保持 tunneld 執行 30~60 秒，等金鑰檔出現\n"
+                    "3. 拔掉 USB 後即可用 WiFi 連線（金鑰無法從別台電腦複製）"
+                )
+            raise ConnectionError(f"WiFi 連線失敗: {e}\n{hint}")
 
     def _connect_usb(self, connection_type=None, target_udid=None) -> dict:
         try:
