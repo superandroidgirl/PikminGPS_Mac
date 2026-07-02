@@ -28,7 +28,7 @@
 
         <!-- Device -->
         <div class="group">
-          <div class="group-title">裝置</div>
+          <div class="group-title">裝置<span class="group-hint">多裝置群組（最多 3 台，操作同步）</span></div>
           <div class="row">
             <label>連線:</label>
             <select id="connType">
@@ -39,11 +39,12 @@
           </div>
           <div class="row">
             <button id="btnConnect" class="btn flex-1">連接 iPhone</button>
-            <button id="btnStop" class="btn flex-1" disabled>停止模擬</button>
+            <button id="btnStop" class="btn flex-1" disabled>全部停止</button>
           </div>
           <div class="row">
             <button id="btnTunneld" class="btn flex-1" title="iOS 17+ 裝置需先啟動通道">啟動 iOS 17+ 通道</button>
           </div>
+          <div class="device-chips" id="deviceChips"></div>
           <div class="device-label" id="deviceLabel">尚未連接裝置</div>
         </div>
 
@@ -224,6 +225,7 @@
   <div id="deviceModal" class="modal hidden">
     <div class="modal-content">
       <h3>選擇裝置</h3>
+      <div class="info-label" id="deviceModalHint">點選要加入群組的 iPhone（最多 3 台，已連接的會標示）。</div>
       <div id="deviceListModal"></div>
       <div class="row" style="margin-top:12px;justify-content:flex-end;">
         <button id="btnModalCancel" class="btn">取消</button>

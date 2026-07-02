@@ -301,6 +301,61 @@ select {
   margin-top: 4px;
 }
 
+.group-hint {
+  font-weight: 400;
+  font-size: 10px;
+  color: #6c7086;
+  margin-left: 6px;
+}
+
+/* ── Multi-device group chips ── */
+
+.device-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 8px;
+  background: linear-gradient(to bottom, #313244, #282838);
+  border: 1px solid #89b4fa;
+  border-radius: 12px;
+  font-size: 11px;
+  color: #cdd6f4;
+  max-width: 100%;
+}
+
+.device-chip-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.device-chip-del {
+  border: none;
+  background: rgba(243,139,168,0.15);
+  color: #f38ba8;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.device-chip-del:hover {
+  background: #f38ba8;
+  color: #1e1e2e;
+}
+
 /* ── Favorites list ── */
 
 .fav-list {
@@ -472,6 +527,28 @@ select {
 .device-option:hover {
   background: rgba(137,180,250,0.15);
   border-color: #89b4fa;
+}
+
+.device-option.connected {
+  border-color: #00d977;
+  color: #a6e3a1;
+  cursor: default;
+  background: rgba(0,217,119,0.08);
+}
+
+.device-option.connected:hover {
+  background: rgba(0,217,119,0.08);
+  border-color: #00d977;
+}
+
+.device-option.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.device-option.disabled:hover {
+  background: none;
+  border-color: #505070;
 }
 
 /* ── Responsive ── */

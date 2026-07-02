@@ -10,7 +10,8 @@ import time
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 
-from device import DeviceManager, log, log_exception
+from device import log_exception
+from device_group import DeviceGroup
 from navigation import (
     fetch_osrm_route, parse_gpx, calculate_route_distance,
     format_distance, format_duration, is_daytime, generate_random_walk,
@@ -22,7 +23,8 @@ app.config["SECRET_KEY"] = "pikmingps"
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ── Global state ──
-device = DeviceManager()
+# 多裝置群組：最多同時連接 3 台 iPhone，所有操作同步 fan-out 到全部裝置。
+group = DeviceGroup()
 walker = RouteWalker()
 state = {
     "lat": 25.0330,
@@ -87,15 +89,17 @@ walker.on_finished = on_walker_finished
 
 
 def send_location(lat, lng):
-    """Send location to connected iOS device."""
-    if device.connected:
-        try:
-            device.set_location(lat, lng)
-        except Exception as e:
-            log_exception("send_location failed")
-            device.connected = False
-            state["connected"] = False
-            socketio.emit("device_disconnected", {"error": str(e)})
+    """Send location to every linked iOS device (multi-device fan-out)."""
+    failed = group.set_location_all(lat, lng)
+    if failed:
+        state["connected"] = group.connected
+        socketio.emit("devices_updated", {
+            "devices": group.list_info(),
+            "connected": group.connected,
+        })
+        for udid, err in failed:
+            log_exception(f"send_location dropped {udid}: {err}")
+            socketio.emit("device_disconnected", {"udid": udid, "error": err})
 
 
 # ── Routes ──
@@ -166,7 +170,8 @@ def get_state():
     return jsonify({
         "lat": state["lat"],
         "lng": state["lng"],
-        "connected": device.connected,
+        "connected": group.connected,
+        "devices": group.list_info(),
         "favorites": state["favorites"],
         "is_day": is_daytime(state["lat"], state["lng"]),
     })
@@ -179,11 +184,17 @@ def handle_connect(data):
     conn_type = data.get("conn_type")  # "USB", "Network", None
     try:
         emit("status", {"msg": "掃描裝置中..."})
-        devices = device.scan_devices()
+        devices = group.scan_devices()
         if not devices:
             emit("connect_error", {"error": "找不到任何 iOS 裝置。\n請確認裝置已連接且已信任此電腦。"})
             return
-        emit("device_list", {"devices": devices})
+        # Tell the client which devices are already linked so the picker can
+        # mark them and enforce the 3-device limit.
+        emit("device_list", {
+            "devices": devices,
+            "connected_udids": [d["udid"] for d in group.list_info()],
+            "max_devices": DeviceGroup.MAX_DEVICES,
+        })
     except Exception as e:
         log_exception("scan failed")
         emit("connect_error", {"error": str(e)})
@@ -197,27 +208,42 @@ def handle_select_device(data):
         emit("status", {"msg": "連線中..."})
         conn_map = {"自動": None, "WiFi": "Network", "USB": "USB"}
         ct = conn_map.get(conn_type, conn_type)
-        info = device.connect(connection_type=ct, target_udid=udid)
+        info = group.add(udid, connection_type=ct)
         state["connected"] = True
         name = info.get("name", "未知")
         ios_ver = info.get("ios_version", "?")
         method = info.get("method", "?")
-        emit("connected", {
-            "info": info,
-            "display": f"{name} | iOS {ios_ver} ({method})",
-        })
+        # Late-joining device catches up to the current position and then
+        # continues the running task via the shared walker fan-out.
         send_location(state["lat"], state["lng"])
+        socketio.emit("devices_updated", {
+            "devices": group.list_info(),
+            "connected": group.connected,
+        })
+        emit("status", {"msg": f"已連接: {name} | iOS {ios_ver} ({method})（共 {group.count} 台）"})
     except Exception as e:
         log_exception("connect failed")
         emit("connect_error", {"error": str(e)})
 
 
+@socketio.on("remove_device")
+def handle_remove_device(data):
+    udid = data.get("udid")
+    group.remove(udid)
+    state["connected"] = group.connected
+    socketio.emit("devices_updated", {
+        "devices": group.list_info(),
+        "connected": group.connected,
+    })
+    emit("status", {"msg": f"已移除裝置（剩 {group.count} 台）"})
+
+
 @socketio.on("stop_simulation")
 def handle_stop():
     try:
-        device.stop_simulation()
-        device.connected = False
+        group.disconnect_all()
         state["connected"] = False
+        socketio.emit("devices_updated", {"devices": [], "connected": False})
         emit("status", {"msg": "模擬已停止 — 已恢復真實 GPS"})
         emit("disconnected")
     except Exception as e:
@@ -569,14 +595,14 @@ def handle_goldditto_cycle(data):
     except (TypeError, ValueError):
         emit("status", {"msg": "拉金盆失敗: A 座標格式有誤"})
         return
-    if not device.connected:
+    if not group.connected:
         emit("status", {"msg": "拉金盆失敗: 請先連接 iPhone"})
         return
     try:
-        device.set_location(lat, lng)
+        group.set_location_all(lat, lng)
         emit("goldditto_phase", {"phase": "teleported", "lat": lat, "lng": lng})
         emit("status", {"msg": f"已瞬移到 A ({lat:.6f}, {lng:.6f})，還原 GPS 中..."})
-        device.stop_simulation()
+        group.stop_all()
         emit("goldditto_phase", {"phase": "restored"})
         emit("status", {"msg": "拉金盆完成 — 已還原真實 GPS"})
     except Exception as e:

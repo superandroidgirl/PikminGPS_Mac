@@ -24,6 +24,7 @@
   const coordInput = $('coordInput');
   const btnTeleport = $('btnTeleport');
   const deviceLabel = $('deviceLabel');
+  const deviceChips = $('deviceChips');
   const connType = $('connType');
   const statusBar = $('statusBar');
 
@@ -96,6 +97,9 @@
   const btnExportClose = $('btnExportClose');
 
   // ── State ──
+  let connectedDevices = [];   // 多裝置群組：目前已連接的裝置清單
+  let maxDevices = 3;
+  let lastScannedDevices = [];  // 最近一次掃描結果（供裝置選擇彈窗重繪）
   let favorites = [];
   let selectedFavIdx = -1;
   let selectedCategory = '全部';
@@ -121,6 +125,8 @@
     .then(data => {
       mapCtrl.setPosition(data.lat, data.lng);
       coordInput.value = data.lat.toFixed(6) + ', ' + data.lng.toFixed(6);
+      connectedDevices = data.devices || [];
+      renderDeviceChips();
       favorites = data.favorites || [];
       renderFavTabs();
       renderFavorites();
@@ -188,49 +194,128 @@
   refreshTunneldStatus();
   setInterval(refreshTunneldStatus, 5000);
 
+  // ── Multi-device group ──
+  function isConnected(udid) {
+    return connectedDevices.some(function (d) { return d.udid === udid; });
+  }
+
+  // 目前群組狀態：更新「連接」按鈕、「全部停止」按鈕與摘要文字
+  function updateDeviceUI() {
+    const n = connectedDevices.length;
+    if (n === 0) {
+      deviceLabel.textContent = '尚未連接裝置';
+      btnConnect.textContent = '連接 iPhone';
+      btnConnect.disabled = false;
+      setActive(btnConnect, false);
+      btnStop.disabled = true;
+    } else {
+      deviceLabel.textContent = '群組已連接 ' + n + '/' + maxDevices + ' 台（操作同步）';
+      setActive(btnConnect, true);
+      btnStop.disabled = false;
+      if (n >= maxDevices) {
+        btnConnect.textContent = '已達上限 (' + n + '/' + maxDevices + ')';
+        btnConnect.disabled = true;
+      } else {
+        btnConnect.textContent = '新增 iPhone (' + n + '/' + maxDevices + ')';
+        btnConnect.disabled = false;
+      }
+    }
+  }
+
+  // 已連接裝置以晶片方式呈現，每個晶片可單獨移除
+  function renderDeviceChips() {
+    deviceChips.innerHTML = '';
+    connectedDevices.forEach(function (d) {
+      const name = (d.name && !d.name.startsWith('usbmux-')) ? d.name : (d.model || d.name || 'iPhone');
+      const chip = document.createElement('div');
+      chip.className = 'device-chip';
+      const label = document.createElement('span');
+      label.className = 'device-chip-label';
+      label.textContent = name + ' · iOS ' + d.ios_version;
+      label.title = (d.display || name) + '\nUDID: ' + d.udid;
+      chip.appendChild(label);
+      const del = document.createElement('button');
+      del.className = 'device-chip-del';
+      del.textContent = '×';
+      del.title = '移除此裝置';
+      del.addEventListener('click', function () {
+        socket.emit('remove_device', { udid: d.udid });
+      });
+      chip.appendChild(del);
+      deviceChips.appendChild(chip);
+    });
+    updateDeviceUI();
+  }
+
   // ── Device connection ──
   btnConnect.addEventListener('click', function () {
+    if (connectedDevices.length >= maxDevices) {
+      setStatus('已達裝置數量上限 (' + maxDevices + ' 台)');
+      return;
+    }
     btnConnect.disabled = true;
     setStatus('掃描裝置中...');
     socket.emit('connect_device', { conn_type: connType.value });
   });
 
-  socket.on('device_list', function (data) {
-    btnConnect.disabled = false;
-    const devices = data.devices;
+  // 繪製裝置選擇彈窗（標示已連接、達上限時停用其餘選項）
+  function renderDeviceModal() {
     deviceListModal.innerHTML = '';
-    devices.forEach(function (d, i) {
+    const full = connectedDevices.length >= maxDevices;
+    lastScannedDevices.forEach(function (d) {
       const name = d.name.startsWith('usbmux-') ? d.model : d.name;
       const div = document.createElement('div');
       div.className = 'device-option';
-      div.textContent = name + ' \u2014 iOS ' + d.ios_version + ' (' + d.udid.slice(-8) + ')';
-      div.addEventListener('click', function () {
-        deviceModal.classList.add('hidden');
-        setStatus('連線中...');
-        socket.emit('select_device', { udid: d.udid, conn_type: connType.value });
-      });
+      const linked = isConnected(d.udid);
+      let text = name + ' - iOS ' + d.ios_version + ' (' + d.udid.slice(-8) + ')';
+      if (linked) {
+        div.classList.add('connected');
+        text += '  ✓ 已連接';
+      } else if (full) {
+        div.classList.add('disabled');
+      }
+      div.textContent = text;
+      if (!linked && !full) {
+        div.addEventListener('click', function () {
+          setStatus('連線中...');
+          socket.emit('select_device', { udid: d.udid, conn_type: connType.value });
+        });
+      }
       deviceListModal.appendChild(div);
     });
+  }
+
+  socket.on('device_list', function (data) {
+    lastScannedDevices = data.devices || [];
+    if (typeof data.max_devices === 'number') maxDevices = data.max_devices;
+    updateDeviceUI();
+    renderDeviceModal();
     deviceModal.classList.remove('hidden');
   });
 
   btnModalCancel.addEventListener('click', function () {
     deviceModal.classList.add('hidden');
-    btnConnect.disabled = false;
-    setStatus('已取消連線');
+    updateDeviceUI();
+    setStatus('已關閉裝置選擇');
   });
 
-  socket.on('connected', function (data) {
-    btnConnect.disabled = false;
-    btnConnect.textContent = '重新連接';
-    setActive(btnConnect, true);
-    btnStop.disabled = false;
-    deviceLabel.textContent = data.display;
-    setStatus('已連接: ' + data.display);
+  // 群組成員變動：伺服器廣播最新已連接裝置清單
+  socket.on('devices_updated', function (data) {
+    connectedDevices = data.devices || [];
+    renderDeviceChips();
+    // 若裝置選擇彈窗開著，同步更新已連接標示；達上限則自動關閉
+    if (!deviceModal.classList.contains('hidden')) {
+      if (connectedDevices.length >= maxDevices) {
+        deviceModal.classList.add('hidden');
+        setStatus('已達裝置數量上限 (' + maxDevices + ' 台)');
+      } else {
+        renderDeviceModal();
+      }
+    }
   });
 
   socket.on('connect_error_msg', function (data) {
-    btnConnect.disabled = false;
+    updateDeviceUI();
     alert(data.error);
     setStatus('連線失敗');
   });
@@ -239,25 +324,19 @@
   socket.on('connect_error', function (data) {
     // Socket.IO built-in connect_error has no .error field
     if (data && data.error) {
-      btnConnect.disabled = false;
+      updateDeviceUI();
       alert(data.error);
       setStatus('連線失敗');
     }
   });
 
   socket.on('disconnected', function () {
-    deviceLabel.textContent = '尚未連接裝置';
-    btnStop.disabled = true;
-    btnConnect.textContent = '連接 iPhone';
-    setActive(btnConnect, false);
+    connectedDevices = [];
+    renderDeviceChips();
   });
 
   socket.on('device_disconnected', function (data) {
-    deviceLabel.textContent = '裝置已斷開: ' + (data.error || '');
-    btnStop.disabled = true;
-    btnConnect.textContent = '連接 iPhone';
-    setActive(btnConnect, false);
-    setStatus('裝置已斷開連接');
+    setStatus('裝置已斷開連接: ' + (data.error || ''));
   });
 
   btnStop.addEventListener('click', function () {
