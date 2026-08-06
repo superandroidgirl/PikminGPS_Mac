@@ -74,6 +74,7 @@
   const btnRouteRedraw = $('btnRouteRedraw');
   const btnRouteStart = $('btnRouteStart');
   const btnRouteStop = $('btnRouteStop');
+  const btnRoutePause = $('btnRoutePause');
   const btnRouteExport = $('btnRouteExport');
   const routeLoop = $('routeLoop');
   const routeLabel = $('routeLabel');
@@ -109,6 +110,7 @@
   let routePoints = [];
   let navWaypoints = [];
   let walking = false;
+  let routePaused = false;  // 手動路線「暫停行走」狀態
 
   function setStatus(msg) {
     statusBar.textContent = msg;
@@ -958,12 +960,21 @@
     }
   });
 
+  // 重設「暫停行走」按鈕（停止 / 重新繪製 / 走完後共用）
+  function resetRoutePause() {
+    routePaused = false;
+    btnRoutePause.textContent = '暫停行走';
+    btnRoutePause.disabled = true;
+    setActive(btnRoutePause, false);
+  }
+
   btnRouteRedraw.addEventListener('click', function () {
     socket.emit('stop_walk');
     routePoints = [];
     btnRouteRedraw.disabled = true;
     btnRouteStart.disabled = true;
     btnRouteExport.disabled = true;
+    resetRoutePause();
     routeModeActive = true;
     btnRouteMode.textContent = '完成路線';
     setActive(btnRouteMode, true);
@@ -980,9 +991,31 @@
     btnRouteStart.disabled = true;
     btnRouteStop.disabled = false;
     setActive(btnRouteStop, true);
+    routePaused = false;
+    btnRoutePause.textContent = '暫停行走';
+    btnRoutePause.disabled = false;
+    setActive(btnRoutePause, false);
     walking = true;
     mapCtrl.setAutoFollow(false);
     setStatus('路線行走已開始');
+  });
+
+  btnRoutePause.addEventListener('click', function () {
+    if (routePaused) {
+      // 目前是暫停狀態 → 從原地繼續走
+      socket.emit('resume_walk');
+      routePaused = false;
+      btnRoutePause.textContent = '暫停行走';
+      setActive(btnRoutePause, false);
+      setStatus('繼續行走');
+    } else {
+      // 目前正在走 → 暫停（保留進度）
+      socket.emit('pause_walk');
+      routePaused = true;
+      btnRoutePause.textContent = '繼續行走';
+      setActive(btnRoutePause, true);
+      setStatus('行走已暫停');
+    }
   });
 
   btnRouteStop.addEventListener('click', function () {
@@ -990,6 +1023,7 @@
     btnRouteStart.disabled = routePoints.length < 2;
     btnRouteStop.disabled = true;
     setActive(btnRouteStop, false);
+    resetRoutePause();
     walking = false;
     navRemainingLabel.textContent = '';
     mapCtrl.setAutoFollow(true);
@@ -1178,6 +1212,7 @@
     btnRouteStart.disabled = routePoints.length < 2;
     btnRouteStop.disabled = true;
     setActive(btnRouteStop, false);
+    resetRoutePause();
     btnRandomStart.disabled = false;
     btnRandomStop.disabled = true;
     setActive(btnRandomStart, false);

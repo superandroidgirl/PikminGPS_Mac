@@ -522,6 +522,18 @@ def handle_stop_walk():
     emit("status", {"msg": "行走已停止"})
 
 
+@socketio.on("pause_walk")
+def handle_pause_walk():
+    walker.pause()
+    emit("status", {"msg": "行走已暫停"})
+
+
+@socketio.on("resume_walk")
+def handle_resume_walk():
+    walker.resume()
+    emit("status", {"msg": "繼續行走"})
+
+
 @socketio.on("update_speed")
 def handle_update_speed(data):
     speed = data.get("speed", 5.0)

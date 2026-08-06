@@ -74,6 +74,22 @@ class RouteWalker:
             self._thread.join(timeout=3)
             self._thread = None
 
+    def pause(self):
+        """停下走路執行緒但保留 _current_segment / _segment_progress，
+        以便之後從原地續走（有別於 start() 會歸零的行為）。"""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=3)
+            self._thread = None
+
+    def resume(self):
+        """從目前進度繼續走，不重設進度。"""
+        if len(self.waypoints) < 2 or self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
     def is_running(self):
         return self._running
 
@@ -110,10 +126,15 @@ class RouteWalker:
     def _run_jump(self):
         """Teleport sequentially through each waypoint, pausing jump_pre_delay
         seconds before each hop and jump_post_delay seconds after arriving.
-        Repeats from the first point when loop is enabled."""
+        Repeats from the first point when loop is enabled.
+
+        The current index is tracked in self._current_segment (not a local
+        variable) so pause()/resume() can continue from where it left off
+        instead of restarting the loop from the first point."""
         n = len(self.waypoints)
         while self._running:
-            for i in range(n):
+            while self._current_segment < n:
+                i = self._current_segment
                 if not self._running:
                     return
                 # Wait before teleporting to this point.
@@ -136,13 +157,16 @@ class RouteWalker:
 
                 is_last = (i == n - 1)
                 if is_last and not self.loop:
+                    self._current_segment += 1
                     continue
                 # Dwell at this point before moving on.
                 if not self._sleep_interruptible(self.jump_post_delay):
                     return
+                self._current_segment += 1
 
             if not self.loop:
                 break
+            self._current_segment = 0
 
         self._running = False
         if self.on_finished:
