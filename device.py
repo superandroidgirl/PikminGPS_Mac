@@ -88,6 +88,14 @@ def is_tunneld_running():
         return False
 
 
+def ensure_tunneld_running():
+    """Start tunneld only when its health endpoint is not responding."""
+    if is_tunneld_running():
+        return
+    log("Tunneld not running, launching...")
+    start_tunneld()
+
+
 def _find_python():
     """Find python3 on macOS."""
     if getattr(sys, "frozen", False):
@@ -188,9 +196,7 @@ class DeviceManager:
 
     def scan_devices(self) -> list[dict]:
         log("=== Scanning devices ===")
-        if not is_tunneld_running():
-            log("Tunneld not running, launching...")
-            start_tunneld()
+        ensure_tunneld_running()
 
         rsds = _async_thread.run(self._scan_tunneld(), timeout=90)
         devices = []
@@ -261,8 +267,7 @@ class DeviceManager:
 
     def _connect_wifi(self, target_udid=None) -> dict:
         log("WiFi mode: connecting directly via tunneld...")
-        if not is_tunneld_running():
-            start_tunneld()
+        ensure_tunneld_running()
 
         try:
             rsd, dvt, loc_sim, info = _async_thread.run(
@@ -324,8 +329,7 @@ class DeviceManager:
         except Exception:
             log_exception("Direct connection failed (expected for iOS 17+)")
 
-        if not is_tunneld_running():
-            start_tunneld()
+        ensure_tunneld_running()
 
         udid = target_udid or info.get("udid")
         try:

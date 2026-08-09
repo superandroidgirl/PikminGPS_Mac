@@ -19,16 +19,28 @@ echo "  PikminGPS Web — macOS"
 echo "============================================"
 echo ""
 
-# Check Python 3 — 優先使用 Homebrew Python，避免 macOS / Xcode 內建受管理環境
-if [ -x "/opt/homebrew/bin/python3" ]; then
-    PYTHON="/opt/homebrew/bin/python3"
-elif [ -x "/usr/local/bin/python3" ]; then
-    PYTHON="/usr/local/bin/python3"
-elif command -v python3 &>/dev/null; then
-    PYTHON=$(command -v python3)
-else
-    echo "[!] 找不到 python3。"
-    echo "    請安裝: brew install python3"
+# iOS 18.2+ 的 tunneld 需要 Python 3.13+ 才能建立 TCP tunnel。
+# 優先選用明確版本的 Homebrew Python，避免誤用 macOS 內建的 Python 3.9。
+PYTHON=""
+PATH_PYTHON="$(command -v python3 2>/dev/null || true)"
+for candidate in \
+    /opt/homebrew/bin/python3.13 \
+    /opt/homebrew/opt/python@3.13/bin/python3.13 \
+    /usr/local/bin/python3.13 \
+    /usr/local/opt/python@3.13/bin/python3.13 \
+    /opt/homebrew/bin/python3 \
+    /usr/local/bin/python3 \
+    "$PATH_PYTHON"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ] && \
+       "$candidate" -c 'import sys; raise SystemExit(sys.version_info < (3, 13))' 2>/dev/null; then
+        PYTHON="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "[!] 找不到 Python 3.13 或更新版本。"
+    echo "    請安裝: brew install python@3.13"
     exit 1
 fi
 
@@ -36,9 +48,10 @@ echo "[OK] Python: $PYTHON"
 $PYTHON --version
 echo ""
 
-# 偵測 venv 是否損壞（原 Python 解譯器被刪除 / 移動）
-if [ -d "venv" ] && ! venv/bin/python -c '' &>/dev/null; then
-    echo "[!] 偵測到損壞的虛擬環境，重新建立..."
+# 偵測 venv 是否損壞或版本過舊。
+if [ -d "venv" ] && \
+   ! venv/bin/python -c 'import sys; raise SystemExit(sys.version_info < (3, 13))' &>/dev/null; then
+    echo "[!] 偵測到損壞或低於 Python 3.13 的虛擬環境，重新建立..."
     rm -rf venv
 fi
 
@@ -69,8 +82,8 @@ else
     if [[ ! "$ans" =~ ^[Nn] ]]; then
         echo "[*] 啟動 tunneld（會跳出管理員密碼視窗）..."
         osascript -e "do shell script \"$TUNNELD_CMD > /tmp/pikmin_tunneld.log 2>&1 &\" with administrator privileges" 2>/dev/null
-        # 等待最多 ~12 秒讓 tunneld 起來
-        for i in $(seq 1 12); do
+        # 首次啟動與建立 TCP tunnel 可能超過 12 秒，最多等待 30 秒。
+        for i in $(seq 1 30); do
             if curl -s -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:49151/hello 2>/dev/null | grep -q "200"; then
                 echo "[OK] tunneld 已啟動（log: /tmp/pikmin_tunneld.log）"
                 break
